@@ -2,7 +2,7 @@ import type { Contract, IBApiNext } from "@stoqey/ib";
 import type { TimeRange } from "gloomberb/time-series";
 import type { Quote, PricePoint, TickerFinancials } from "gloomberb/types/financials";
 import type { BrokerContractRef } from "gloomberb/types/instrument";
-import { parseFinStatements, parseReportSnapshot } from "gloomberb-ibkr/fundamental-parser";
+import { parseFinStatements, parseReportSnapshot } from "gloom-ibkr/fundamental-parser";
 import { IBKR_DATA_TIMEOUT, withTimeout } from "./timeouts";
 
 export interface IbkrTickerFinancialsContext {

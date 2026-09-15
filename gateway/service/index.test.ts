@@ -249,13 +249,25 @@ test("remote gateway snapshots are side-effect-free", async () => {
   }
 });
 
-test("native gateway loader bundles without a runtime ./native specifier", async () => {
-  const outdir = mkdtempSync(join(tmpdir(), "gloomberb-ibkr-service-"));
+/**
+ * The two entries split the plugin between the process that owns the socket
+ * and the renderer that draws the panes. Each has one property that, if lost,
+ * breaks a whole target: the Bun entry must carry the socket module inside
+ * the bundle (a compiled host cannot resolve `./native` at runtime), and the
+ * browser entry must never reach it (Bun's browser target rejects `node:net`,
+ * so the desktop view would fail to compile the plugin and list it as failed).
+ */
+const PLUGIN_ROOT = join(import.meta.dir, "..", "..");
+const HOST_EXTERNALS = ["react", "react/*", "gloomberb", "gloomberb/*", "gloom-ibkr", "gloom-ibkr/*"];
+
+test("the Bun entry bundles the socket module without a runtime ./native specifier", async () => {
+  const outdir = mkdtempSync(join(tmpdir(), "gloom-ibkr-gateway-bun-"));
   try {
     const result = await Bun.build({
-      entrypoints: [join(import.meta.dir, "index.ts")],
+      entrypoints: [join(PLUGIN_ROOT, "index.tsx")],
       outdir,
       target: "bun",
+      external: HOST_EXTERNALS,
     });
 
     expect(result.success).toBe(true);
@@ -263,6 +275,27 @@ test("native gateway loader bundles without a runtime ./native specifier", async
     expect(entry).toContain("gateway/service/native.ts");
     expect(entry).not.toContain('"./native"');
     expect(entry).not.toContain("'./native'");
+  } finally {
+    rmSync(outdir, { recursive: true, force: true });
+  }
+});
+
+test("the browser entry compiles for a browser without the socket module", async () => {
+  const outdir = mkdtempSync(join(tmpdir(), "gloom-ibkr-gateway-browser-"));
+  try {
+    const result = await Bun.build({
+      entrypoints: [join(PLUGIN_ROOT, "index.browser.tsx")],
+      outdir,
+      target: "browser",
+      external: HOST_EXTERNALS,
+    });
+
+    expect(result.logs.map((log) => log.message)).toEqual([]);
+    expect(result.success).toBe(true);
+    const entry = readFileSync(join(outdir, "index.browser.js"), "utf8");
+    expect(entry).not.toContain("gateway/service/native");
+    expect(entry).not.toContain("@stoqey/ib");
+    expect(entry).toContain("ibkr-trading");
   } finally {
     rmSync(outdir, { recursive: true, force: true });
   }

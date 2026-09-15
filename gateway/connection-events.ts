@@ -3,7 +3,7 @@ import {
   EventName,
   type IBApiNext,
 } from "@stoqey/ib";
-import type { IbkrSnapshot } from "gloomberb-ibkr/gateway-types";
+import type { IbkrSnapshot } from "gloom-ibkr/gateway-types";
 import {
   getIbErrorCode,
   getIbErrorMessage,

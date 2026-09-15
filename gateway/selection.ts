@@ -1,13 +1,13 @@
 import type { AppConfig } from "gloomberb/types/config";
 import type { BrokerAccount } from "gloomberb/types/trading";
 import { getBrokerInstance } from "gloomberb/utils";
-import { normalizeIbkrConfig } from "gloomberb-ibkr/config";
+import { normalizeIbkrConfig } from "gloom-ibkr/config";
 import { ibkrGatewayManager } from "./service";
 import {
   getConfiguredIbkrGatewayInstances,
   getLockedIbkrTradingInstanceId,
   resolveIbkrTradingInstanceId,
-} from "gloomberb-ibkr/instance-selection";
+} from "gloom-ibkr/instance-selection";
 import {
   getGatewayRequiredMessage,
   useGatewaySnapshot,

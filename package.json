@@ -1,13 +1,14 @@
 {
-  "name": "gloomberb-ibkr-gateway",
+  "name": "gloom-ibkr-gateway",
   "version": "1.0.0",
   "description": "Live IBKR market data, trading console, and order entry through Gateway or TWS",
   "type": "module",
   "main": "index.tsx",
+  "browser": "index.browser.tsx",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/gloom-sh/gloomberb-ibkr-gateway"
+    "url": "https://github.com/gloom-sh/gloom-ibkr-gateway"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
@@ -19,14 +20,14 @@
   },
   "peerDependencies": {
     "gloomberb": ">=0.14.0",
-    "gloomberb-ibkr": ">=1.0.0",
+    "gloom-ibkr": ">=1.0.0",
     "react": ">=19"
   },
   "peerDependenciesMeta": {
     "gloomberb": {
       "optional": true
     },
-    "gloomberb-ibkr": {
+    "gloom-ibkr": {
       "optional": true
     },
     "react": {

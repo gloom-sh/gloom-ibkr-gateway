@@ -1,6 +1,6 @@
 import { MarketDataType } from "@stoqey/ib";
 import { isMarketDataPermissionError } from "../market-data";
-import type { IbkrSnapshot } from "gloomberb-ibkr/gateway-types";
+import type { IbkrSnapshot } from "gloom-ibkr/gateway-types";
 
 export async function withIbkrMarketDataFallback<T>({
   operation,

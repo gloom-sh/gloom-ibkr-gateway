@@ -7,7 +7,7 @@ import {
 import type { QuoteSubscriptionTarget } from "gloomberb/types/data-provider";
 import type { Quote } from "gloomberb/types/financials";
 import { normalizeSymbol } from "gloomberb/utils";
-import type { IbkrGatewayConfig } from "gloomberb-ibkr/gateway-types";
+import type { IbkrGatewayConfig } from "gloom-ibkr/gateway-types";
 import { getIbkrPriceDivisor, normalizeIbkrPriceValue } from "./price-normalization";
 
 export interface TickByTickAllLast {

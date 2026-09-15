@@ -3,7 +3,7 @@ import { PriceSelectorDialog } from "gloomberb/components";
 import type { DialogApi, PromptContext } from "gloomberb/dialog";
 import type { TickerFinancials } from "gloomberb/types/financials";
 import type { TickerRecord } from "gloomberb/types/ticker";
-import { InputDialog } from "gloomberb-ibkr/dialogs";
+import { InputDialog } from "gloom-ibkr/dialogs";
 import { setTradeTicketMessage } from "../../trading/state";
 
 export type NumericEditor = (

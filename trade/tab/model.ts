@@ -1,6 +1,6 @@
 import type { BrokerContractRef } from "gloomberb/types/instrument";
 import type { TickerRecord } from "gloomberb/types/ticker";
-import type { IbkrSnapshot } from "gloomberb-ibkr/gateway-types";
+import type { IbkrSnapshot } from "gloom-ibkr/gateway-types";
 import { normalizeContract, type TradeTicketState } from "../../trading/state";
 import {
   formatContractLabel,

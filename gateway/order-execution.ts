@@ -1,7 +1,7 @@
 import { EventName, type Contract, type Order, type OrderState } from "@stoqey/ib";
 import type { BrokerContractRef } from "gloomberb/types/instrument";
 import type { BrokerOrder, BrokerOrderPreview, BrokerOrderRequest } from "gloomberb/types/trading";
-import type { IbkrGatewayConfig } from "gloomberb-ibkr/gateway-types";
+import type { IbkrGatewayConfig } from "gloom-ibkr/gateway-types";
 import { buildIbkrOrder } from "./orders";
 
 const ORDER_ACK_TIMEOUT_MS = 10_000;

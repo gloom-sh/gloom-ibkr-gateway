@@ -72,7 +72,7 @@ import {
 import { withIbkrMarketDataFallback } from "./market-data";
 import { IbkrGatewayServiceManager } from "./manager";
 import { IBKR_DATA_TIMEOUT, withTimeout } from "../timeouts";
-import type { IbkrGatewayConfig, IbkrSnapshot, ResolvedIbkrGatewayConnection } from "gloomberb-ibkr/gateway-types";
+import type { IbkrGatewayConfig, IbkrSnapshot, ResolvedIbkrGatewayConnection } from "gloom-ibkr/gateway-types";
 
 export { summarizeBrokerAccount } from "../account-summary";
 export { diagnoseLocalIbkrPortIssue, resolveGatewayConnection } from "../connection";

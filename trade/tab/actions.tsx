@@ -8,8 +8,8 @@ import type {
   BrokerOrderType,
 } from "gloomberb/types/trading";
 import { getBrokerInstance } from "gloomberb/utils";
-import { isGatewayConfigured, type IbkrConfig } from "gloomberb-ibkr/config";
-import { ChoiceDialog, InputDialog } from "gloomberb-ibkr/dialogs";
+import { isGatewayConfigured, type IbkrConfig } from "gloom-ibkr/config";
+import { ChoiceDialog, InputDialog } from "gloom-ibkr/dialogs";
 import type { ibkrGatewayManager } from "../../gateway/service";
 import { refreshGatewayData } from "../../gateway/helpers";
 import { promptIbkrAccountChoice, promptIbkrProfileChoice } from "../dialogs";

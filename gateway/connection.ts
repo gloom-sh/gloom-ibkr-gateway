@@ -1,5 +1,5 @@
 import { createConnection } from "net";
-import type { IbkrGatewayConfig, ResolvedIbkrGatewayConnection } from "gloomberb-ibkr/gateway-types";
+import type { IbkrGatewayConfig, ResolvedIbkrGatewayConnection } from "gloom-ibkr/gateway-types";
 
 const LOCAL_IBKR_HOSTS = new Set(["127.0.0.1", "localhost", "::1"]);
 const COMMON_LOCAL_IBKR_PORTS = [4001, 4002, 7496, 7497] as const;

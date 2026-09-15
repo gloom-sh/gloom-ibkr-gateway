@@ -7,7 +7,7 @@ import type { Quote } from "gloomberb/types/financials";
 import type { BrokerAccount } from "gloomberb/types/trading";
 import { formatCurrency } from "gloomberb/utils";
 import { formatMarketPrice, formatMarketQuantity } from "gloomberb/market-data";
-import type { IbkrSnapshot } from "gloomberb-ibkr/gateway-types";
+import type { IbkrSnapshot } from "gloom-ibkr/gateway-types";
 import type { TradingPaneState } from "./state";
 
 type OpenOrder = IbkrSnapshot["openOrders"][number];

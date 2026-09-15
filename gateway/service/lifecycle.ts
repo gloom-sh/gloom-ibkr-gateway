@@ -12,7 +12,7 @@ import {
   isClientIdInUseError,
   marketDataTypeFromConfig,
 } from "../market-data";
-import type { IbkrGatewayConfig, IbkrSnapshot, ResolvedIbkrGatewayConnection } from "gloomberb-ibkr/gateway-types";
+import type { IbkrGatewayConfig, IbkrSnapshot, ResolvedIbkrGatewayConnection } from "gloom-ibkr/gateway-types";
 
 const gatewayLifecycleLog = debugLog.createLogger("ibkr-gateway");
 

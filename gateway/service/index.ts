@@ -16,17 +16,21 @@ import type {
   IbkrGatewayConfig,
   IbkrSnapshot,
   ResolvedIbkrGatewayConnection,
-} from "gloomberb-ibkr/gateway-types";
-import {
-  loadNativeGatewayModule as loadDefaultNativeGatewayModule,
-  type NativeGatewayModule,
-} from "./native-loader";
+} from "gloom-ibkr/gateway-types";
+
+/** What `index.tsx` hands over: the module that owns the socket. */
+export type NativeGatewayModule = {
+  ibkrGatewayManager: any;
+  setResolvedIbkrGatewayListener(
+    listener: ((instanceId: string | undefined, connection: ResolvedIbkrGatewayConnection) => void | Promise<void>) | null,
+  ): void;
+};
 
 export type { IbkrGatewayServiceFacade };
 export type {
   IbkrGatewayConfig,
   ResolvedIbkrGatewayConnection,
-} from "gloomberb-ibkr/gateway-types";
+} from "gloom-ibkr/gateway-types";
 
 type NativeGatewayManager = any;
 type NativeGatewayService = any;
@@ -57,14 +61,23 @@ function getSnapshotEntry(instanceId?: string): IbkrSnapshot {
   return snapshots.get(instanceId) ?? DEFAULT_SNAPSHOT;
 }
 
-function defaultNativeGatewayModuleLoader(): Promise<NativeGatewayModule> {
-  return loadDefaultNativeGatewayModule();
+/**
+ * No loader until an entry installs one. The Bun entry points this at the
+ * socket implementation; the browser entry leaves it alone, because the view
+ * reaches the socket through the host's remote broker client and must never
+ * pull `@stoqey/ib` into a browser bundle. This module is imported by every
+ * pane, so it cannot name the native module itself, even dynamically.
+ */
+function unavailableNativeGatewayModuleLoader(): Promise<NativeGatewayModule> {
+  return Promise.reject(new Error("IBKR Gateway cannot open a socket from this renderer."));
 }
 
-nativeGatewayModuleLoader = defaultNativeGatewayModuleLoader;
+nativeGatewayModuleLoader = unavailableNativeGatewayModuleLoader;
 
 export function setNativeIbkrGatewayModuleLoader(loader: (() => Promise<NativeGatewayModule>) | null): void {
-  nativeGatewayModuleLoader = loader ?? defaultNativeGatewayModuleLoader;
+  nativeGatewayModuleLoader = loader ?? unavailableNativeGatewayModuleLoader;
+  // A loader that was already tried and rejected must not pin the failure.
+  nativeGatewayModulePromise = null;
 }
 
 function applySnapshot(instanceId: string, patch: Partial<IbkrSnapshot>, shouldNotify: boolean): IbkrSnapshot {
