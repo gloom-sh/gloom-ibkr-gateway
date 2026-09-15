@@ -2,7 +2,7 @@ import type { DialogApi, PromptContext } from "gloomberb/dialog";
 import type { BrokerInstanceConfig } from "gloomberb/types/config";
 import type { BrokerAccount } from "gloomberb/types/trading";
 import { formatCurrency } from "gloomberb/utils";
-import { ChoiceDialog } from "gloomberb-ibkr/dialogs";
+import { ChoiceDialog } from "gloom-ibkr/dialogs";
 
 export function promptIbkrProfileChoice(
   dialog: DialogApi,

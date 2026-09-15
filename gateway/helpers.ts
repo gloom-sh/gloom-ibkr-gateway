@@ -1,6 +1,6 @@
 import { useCallback, useSyncExternalStore } from "react";
 import type { BrokerInstanceConfig } from "gloomberb/types/config";
-import { getGatewayConfig } from "gloomberb-ibkr/config";
+import { getGatewayConfig } from "gloom-ibkr/config";
 import { ibkrGatewayManager } from "./service";
 
 export function useGatewaySnapshot(instanceId?: string) {

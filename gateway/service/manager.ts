@@ -1,4 +1,4 @@
-import type { IbkrSnapshot } from "gloomberb-ibkr/gateway-types";
+import type { IbkrSnapshot } from "gloom-ibkr/gateway-types";
 
 export interface IbkrGatewayServiceLike {
   getSnapshot(): IbkrSnapshot;

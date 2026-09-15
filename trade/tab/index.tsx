@@ -9,7 +9,7 @@ import {
 } from "gloomberb/react";
 import { EmptyState } from "gloomberb/components";
 import type { TickerResearchTabProps } from "gloomberb/types/plugin";
-import { isGatewayConfigured } from "gloomberb-ibkr/config";
+import { isGatewayConfigured } from "gloom-ibkr/config";
 import { useIbkrGatewaySelection } from "../../gateway/selection";
 import { TradePreviewPanel } from "../preview-panel";
 import { TradeTabHeader } from "./header";

@@ -14,7 +14,7 @@ import type { PaneProps } from "gloomberb/types/plugin";
 import { isPlainKey } from "gloomberb/utils";
 import { getBrokerInstance } from "gloomberb/utils";
 import { usePluginPaneActions } from "gloomberb/react";
-import { isGatewayConfigured } from "gloomberb-ibkr/config";
+import { isGatewayConfigured } from "gloom-ibkr/config";
 import { useIbkrGatewaySelection } from "../gateway/selection";
 import { refreshGatewayData } from "../gateway/helpers";
 import { promptIbkrAccountChoice, promptIbkrProfileChoice } from "../trade/dialogs";

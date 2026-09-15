@@ -6,7 +6,7 @@ import type { BrokerAccount, BrokerOrderPreview, BrokerOrderType } from "gloombe
 import { formatCompact, formatCurrency } from "gloomberb/utils";
 export { truncateWithEllipsis as truncateTradeText } from "gloomberb/utils";
 import { formatMarketPrice, formatMarketPriceWithCurrency, formatSignedMarketPrice, type AssetDisplayContext } from "gloomberb/market-data";
-import { getConfiguredIbkrGatewayInstances } from "gloomberb-ibkr/instance-selection";
+import { getConfiguredIbkrGatewayInstances } from "gloom-ibkr/instance-selection";
 
 export type TradeTone = "neutral" | "accent" | "positive" | "negative";
 

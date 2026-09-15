@@ -2,7 +2,7 @@ import { MarketDataType, type Contract, type ContractDetails, type IBApiNext } f
 import type { QuoteSubscriptionTarget } from "gloomberb/types/data-provider";
 import { debugLog } from "gloomberb/utils";
 import type { BrokerContractRef } from "gloomberb/types/instrument";
-import type { IbkrGatewayConfig } from "gloomberb-ibkr/gateway-types";
+import type { IbkrGatewayConfig } from "gloom-ibkr/gateway-types";
 import {
   buildQuoteStreamKey,
   normalizeQuoteStreamTarget,
