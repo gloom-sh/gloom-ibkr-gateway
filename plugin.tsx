@@ -44,7 +44,7 @@ function openTradeForSymbol(
 export const ibkrGatewayPlugin: GloomPlugin = {
   id: "ibkr-gateway",
   name: "IBKR Gateway",
-  version: "1.0.0",
+  version: "1.1.0",
   description: "Live market data, the trading console, and order entry through IBKR Gateway or TWS.",
   homepage: "https://github.com/gloom-sh/gloom-ibkr-gateway",
   toggleable: true,
