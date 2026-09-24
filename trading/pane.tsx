@@ -304,17 +304,15 @@ export function TradingPane({ focused, width, height }: PaneProps) {
   usePaneFooter("ibkr-trading-pane", () => {
     // Without a profile the body already says what is missing.
     if (!hasProfile) return { info: [], hints: [] };
-    const info: PaneFooterSegment[] = [{
-      id: "connection",
-      parts: [{
-        text: displayStatusState,
-        tone: displayStatusState === "connected" ? "positive" : displayStatusState === "error" ? "negative" : "muted",
-      }],
+    // One segment, so a long Gateway message is cut at its end instead of squeezing the state.
+    const parts: PaneFooterSegment["parts"] = [{
+      text: displayStatusState,
+      tone: displayStatusState === "connected" ? "positive" : displayStatusState === "error" ? "negative" : "muted",
     }];
-    if (tradeState.busy) info.push({ id: "busy", parts: [{ text: "working...", tone: "muted" }] });
-    if (message) info.push({ id: "message", parts: [{ text: message, tone: messageTone }] });
+    if (tradeState.busy) parts.push({ text: "working...", tone: "muted" });
+    if (message) parts.push({ text: message, tone: messageTone });
     return {
-      info,
+      info: [{ id: "status", parts }],
       hints: [
         {
           id: "profile",

@@ -95,7 +95,11 @@ export function buildTradePreviewItems(preview: BrokerOrderPreview | null): Stat
   return items;
 }
 
-/** The ticket's changing status for the footer: work in flight, the last result, the order being modified. */
+/**
+ * The ticket's changing status for the footer: the order being modified, then
+ * work in flight or the last result. One segment, so a long Gateway message is
+ * cut at its end instead of squeezing the order number.
+ */
 export function buildTradeFooterInfo({
   ticketState,
   gatewaySnapshot,
@@ -103,25 +107,21 @@ export function buildTradeFooterInfo({
   ticketState: TradeTicketState;
   gatewaySnapshot: IbkrSnapshot;
 }): PaneFooterSegment[] {
-  const info: PaneFooterSegment[] = [];
-  if (ticketState.busy) {
-    info.push({ id: "busy", parts: [{ text: "working...", tone: "muted" }] });
+  const parts: PaneFooterSegment["parts"] = [];
+  if (ticketState.editingOrderId) {
+    parts.push({ text: `modifying order ${ticketState.editingOrderId}`, tone: "warning" });
   }
   const message = ticketState.lastError
     || ticketState.lastInfo
     || gatewaySnapshot.status.message
     || gatewaySnapshot.lastError;
-  if (!ticketState.busy && message) {
-    info.push({
-      id: "message",
-      parts: [{
-        text: message,
-        tone: ticketState.lastError ? "negative" : ticketState.isSuccess ? "positive" : "muted",
-      }],
+  if (ticketState.busy) {
+    parts.push({ text: "working...", tone: "muted" });
+  } else if (message) {
+    parts.push({
+      text: message,
+      tone: ticketState.lastError ? "negative" : ticketState.isSuccess ? "positive" : "muted",
     });
   }
-  if (ticketState.editingOrderId) {
-    info.push({ id: "editing", parts: [{ text: `modifying order ${ticketState.editingOrderId}`, tone: "warning" }] });
-  }
-  return info;
+  return parts.length > 0 ? [{ id: "status", parts }] : [];
 }
