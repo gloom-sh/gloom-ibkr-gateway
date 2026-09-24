@@ -1,25 +1,37 @@
 import { useMemo } from "react";
 import { Box, TextAttributes } from "gloomberb/ui";
-import { DataTableView, Divider, Notice, SectionHeading, Spinner, type DataTableCell, type DataTableColumn } from "gloomberb/components";
+import {
+  DataTableView,
+  PaneStatusBody,
+  QueryBar,
+  StatGrid,
+  Tabs,
+  type DataTableCell,
+  type DataTableColumn,
+  type QueryBarFilter,
+  type StatItem,
+} from "gloomberb/components";
 import { colors, priceColor } from "gloomberb/theme";
-import type { BrokerInstanceConfig } from "gloomberb/types/config";
 import type { Quote } from "gloomberb/types/financials";
 import type { BrokerAccount } from "gloomberb/types/trading";
 import { formatCurrency } from "gloomberb/utils";
 import { formatMarketPrice, formatMarketQuantity } from "gloomberb/market-data";
 import type { IbkrSnapshot } from "gloom-ibkr/gateway-types";
-import type { TradingPaneState } from "./state";
 
 type OpenOrder = IbkrSnapshot["openOrders"][number];
 type Execution = IbkrSnapshot["executions"][number];
 
-/** Below this the two panels cannot both hold a readable table, so they stack. */
-const STACK_BELOW_WIDTH = 72;
+export type TradingConsoleTab = "orders" | "executions";
+
+export const TRADING_CONSOLE_TABS: { label: string; value: TradingConsoleTab }[] = [
+  { label: "Open Orders", value: "orders" },
+  { label: "Executions", value: "executions" },
+];
 
 const OPEN_ORDER_COLUMNS: DataTableColumn[] = [
   { id: "orderId", label: "ID", width: 7, align: "left" },
   { id: "action", label: "SIDE", width: 5, align: "left" },
-  { id: "symbol", label: "SYMBOL", width: 14, align: "left" },
+  { id: "symbol", label: "SYMBOL", width: 14, align: "left", flexGrow: 1 },
   { id: "status", label: "STATUS", width: 10, align: "left" },
   { id: "remaining", label: "QTY", width: 6, align: "right" },
   { id: "price", label: "PRICE", width: 9, align: "right" },
@@ -27,12 +39,38 @@ const OPEN_ORDER_COLUMNS: DataTableColumn[] = [
   { id: "ask", label: "ASK", width: 8, align: "right" },
 ];
 
+/** Narrower than this the quote columns go first, so the order itself never scrolls sideways. */
+const QUOTE_COLUMNS_MIN_WIDTH = 78;
+const OPEN_ORDER_COLUMNS_NARROW = OPEN_ORDER_COLUMNS.filter((column) => column.id !== "bid" && column.id !== "ask");
+
 const EXECUTION_COLUMNS: DataTableColumn[] = [
   { id: "side", label: "SIDE", width: 5, align: "left" },
-  { id: "symbol", label: "SYMBOL", width: 16, align: "left" },
+  { id: "symbol", label: "SYMBOL", width: 16, align: "left", flexGrow: 1 },
   { id: "shares", label: "QTY", width: 7, align: "right" },
   { id: "price", label: "PRICE", width: 10, align: "right" },
 ];
+
+function signedCurrency(value: number, currency: string): string {
+  return `${value > 0 ? "+" : ""}${formatCurrency(value, currency)}`;
+}
+
+/** The selected account's figures, the summary band of the console. */
+export function buildAccountStatItems(account: BrokerAccount | undefined): StatItem[] {
+  if (!account) return [];
+  const currency = account.currency || "USD";
+  return [
+    { id: "net-liq", label: "Net Liq", value: formatCurrency(account.netLiquidation || 0, currency) },
+    ...(account.buyingPower != null
+      ? [{ id: "buying-power", label: "Buying Power", value: formatCurrency(account.buyingPower, currency) }]
+      : []),
+    ...(account.availableFunds != null
+      ? [{ id: "available", label: "Available", value: formatCurrency(account.availableFunds, currency) }]
+      : []),
+    ...(account.dailyPnl != null
+      ? [{ id: "day-pnl", label: "Day P&L", value: signedCurrency(account.dailyPnl, currency), color: priceColor(account.dailyPnl) }]
+      : []),
+  ];
+}
 
 function renderOpenOrderCell(
   order: OpenOrder,
@@ -92,142 +130,113 @@ function renderExecutionCell(execution: Execution, column: DataTableColumn): Dat
 }
 
 export function TradingPaneView({
-  activeAccount,
-  displayStatusState,
-  gatewayInstancesCount,
+  emptyTitle,
+  filters,
   gatewaySnapshot,
   getOrderQuote,
   height,
-  isGatewayMode,
-  lockedBrokerInstanceId,
   onOpenSelectedOrder,
   onSelectExecutionSymbol,
   onSelectOpenOrderIndex,
-  selectedInstance,
-  tradeState,
+  onSelectTab,
+  selectedOpenOrderIndex,
+  statItems,
+  tab,
+  tabsInHeader,
   width,
   focused = false,
 }: {
-  activeAccount: BrokerAccount | undefined;
-  displayStatusState: IbkrSnapshot["status"]["state"];
-  gatewayInstancesCount: number;
+  /** Set when there is no Gateway profile to show; replaces the whole body. */
+  emptyTitle?: string;
+  filters: QueryBarFilter[];
   gatewaySnapshot: IbkrSnapshot;
   getOrderQuote: (symbol: string) => Quote | null;
   height: number;
-  isGatewayMode: boolean;
-  lockedBrokerInstanceId: string | null | undefined;
   onOpenSelectedOrder: () => void;
   onSelectExecutionSymbol: (symbol: string) => void;
   onSelectOpenOrderIndex: (index: number) => void;
-  selectedInstance: BrokerInstanceConfig | undefined;
-  tradeState: TradingPaneState;
+  onSelectTab: (tab: TradingConsoleTab) => void;
+  selectedOpenOrderIndex: number;
+  statItems: StatItem[];
+  tab: TradingConsoleTab;
+  tabsInHeader: boolean;
   width: number;
   focused?: boolean;
 }) {
-  const stacked = width < STACK_BELOW_WIDTH;
-  const bodyHeight = Math.max(4, height - 4);
-  const orderPanelWidth = stacked ? Math.max(8, width - 2) : Math.max(24, Math.floor(width * 0.6));
-  const listPanelWidth = stacked ? Math.max(8, width - 2) : Math.max(16, width - orderPanelWidth - 1);
-  const orderPanelHeight = stacked ? Math.max(2, Math.ceil(bodyHeight / 2)) : bodyHeight;
-  const executionPanelHeight = stacked ? Math.max(2, bodyHeight - orderPanelHeight) : bodyHeight;
-
   const executions = useMemo(
     () => gatewaySnapshot.executions.slice(0, 20),
     [gatewaySnapshot.executions],
   );
 
+  if (emptyTitle) {
+    return <PaneStatusBody empty emptyTitle={emptyTitle} />;
+  }
+
+  // The terminal draws the tab strip in the body; the desktop puts it in the title bar.
+  const tableHeight = Math.max(3, height - (tabsInHeader ? 0 : 1));
+  const header = (
+    <>
+      <QueryBar width={width} filters={filters} />
+      <StatGrid items={statItems} width={width} />
+    </>
+  );
+
   return (
-    <Box flexDirection="column" flexGrow={1} paddingX={1}>
-      <Box flexDirection="row" height={1}>
-        <Box flexGrow={1} overflow="hidden">
-          <Notice tone={
-            displayStatusState === "connected"
-              ? "positive"
-              : displayStatusState === "error"
-                ? "negative"
-                : "muted"
-          }>
-            {selectedInstance
-              ? `${selectedInstance.label} · ${isGatewayMode ? "Gateway" : "Flex"} · ${displayStatusState}`
-              : "IBKR · no profile selected"}
-          </Notice>
-        </Box>
-        {tradeState.busy && <Spinner label="Working..." />}
-      </Box>
-
-      <Box height={1} overflow="hidden">
-        <Notice tone="muted">
-          {activeAccount
-            ? `${selectedInstance?.label || "IBKR"} → ${activeAccount.accountId} · ${formatCurrency(activeAccount.netLiquidation || 0, activeAccount.currency || "USD")} net liq`
-            : isGatewayMode
-              ? lockedBrokerInstanceId
-                ? `Locked to ${selectedInstance?.label || "IBKR"}`
-                : "No account selected"
-              : gatewayInstancesCount > 0
-                ? "Choose a Gateway / TWS profile"
-                : "Connect an IBKR profile"}
-        </Notice>
-      </Box>
-
-      <Box height={1} overflow="hidden">
-        <Notice tone={tradeState.lastError ? "negative" : "muted"}>
-          {tradeState.lastError
-            || gatewaySnapshot.status.message
-            || gatewaySnapshot.lastError
-            || tradeState.lastInfo
-            || "Use this console for profile status, accounts, open orders, and executions."}
-        </Notice>
-      </Box>
-
-      <Divider width={Math.max(1, width - 2)} />
-
-      <Box flexDirection={stacked ? "column" : "row"} height={bodyHeight}>
-        <Box width={orderPanelWidth} height={orderPanelHeight} flexDirection="column">
-          <SectionHeading title="Open Orders" />
-          <DataTableView<OpenOrder>
-            focused={focused}
-            columns={OPEN_ORDER_COLUMNS}
-            items={gatewaySnapshot.openOrders}
-            sortColumnId={null}
-            sortDirection="asc"
-            onHeaderClick={() => {}}
-            getItemKey={(order) => String(order.orderId)}
-            renderCell={(order, column) => renderOpenOrderCell(order, column, getOrderQuote)}
-            selection={{
-              kind: "index",
-              selectedIndex: tradeState.selectedOpenOrderIndex,
-              onChange: (index) => onSelectOpenOrderIndex(index),
-            }}
-            onActivate={onOpenSelectedOrder}
-            emptyStateTitle="No open IBKR orders."
-          />
-        </Box>
-
-        {!stacked && <Divider orientation="vertical" height={bodyHeight} />}
-
-        <Box width={listPanelWidth} height={executionPanelHeight} flexDirection="column">
-          <SectionHeading title="Executions" />
-          <DataTableView<Execution>
-            columns={EXECUTION_COLUMNS}
-            items={executions}
-            sortColumnId={null}
-            sortDirection="asc"
-            onHeaderClick={() => {}}
-            getItemKey={(execution) => execution.execId}
-            renderCell={renderExecutionCell}
-            selection={{ kind: "none" }}
-            onActivate={(execution) => {
-              const symbol = execution.contract.symbol;
-              if (symbol) onSelectExecutionSymbol(symbol);
-            }}
-            onRowMouseDown={(execution) => {
-              const symbol = execution.contract.symbol;
-              if (symbol) onSelectExecutionSymbol(symbol);
-            }}
-            emptyStateTitle="No recent executions."
-          />
-        </Box>
-      </Box>
+    <Box flexDirection="column" flexGrow={1} width={width} height={height}>
+      {!tabsInHeader && (
+        <Tabs
+          tabs={TRADING_CONSOLE_TABS}
+          activeValue={tab}
+          onSelect={(value) => onSelectTab(value as TradingConsoleTab)}
+          focused={focused}
+          // The pane captures its keys and switches tabs itself.
+          keyboardNavigation={false}
+          dense
+        />
+      )}
+      {tab === "orders" ? (
+        <DataTableView<OpenOrder>
+          focused={focused}
+          rootWidth={width}
+          rootHeight={tableHeight}
+          rootBefore={header}
+          columns={width >= QUOTE_COLUMNS_MIN_WIDTH ? OPEN_ORDER_COLUMNS : OPEN_ORDER_COLUMNS_NARROW}
+          items={gatewaySnapshot.openOrders}
+          sortColumnId={null}
+          sortDirection="asc"
+          getItemKey={(order) => String(order.orderId)}
+          renderCell={(order, column) => renderOpenOrderCell(order, column, getOrderQuote)}
+          selection={{
+            kind: "index",
+            selectedIndex: selectedOpenOrderIndex,
+            onChange: (index) => onSelectOpenOrderIndex(index),
+          }}
+          onActivate={onOpenSelectedOrder}
+          emptyStateTitle="No open IBKR orders."
+        />
+      ) : (
+        <DataTableView<Execution>
+          rootWidth={width}
+          rootHeight={tableHeight}
+          rootBefore={header}
+          columns={EXECUTION_COLUMNS}
+          items={executions}
+          sortColumnId={null}
+          sortDirection="asc"
+          getItemKey={(execution) => execution.execId}
+          renderCell={renderExecutionCell}
+          selection={{ kind: "none" }}
+          onActivate={(execution) => {
+            const symbol = execution.contract.symbol;
+            if (symbol) onSelectExecutionSymbol(symbol);
+          }}
+          onRowMouseDown={(execution) => {
+            const symbol = execution.contract.symbol;
+            if (symbol) onSelectExecutionSymbol(symbol);
+          }}
+          emptyStateTitle="No recent executions."
+        />
+      )}
     </Box>
   );
 }

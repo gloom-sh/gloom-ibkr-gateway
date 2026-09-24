@@ -2,7 +2,7 @@
 
 Live market data, the trading console, and order entry through IBKR Gateway or TWS.
 
-This branch uses the shared pane UI in [Gloomberb #743](https://github.com/gloom-sh/gloomberb/pull/743), targeting Gloomberb 0.14.0. That release is pending; released 0.13.3 is not supported.
+Requires Gloomberb 0.15.0 or later, for the query bar, stat bands and title-bar tabs from [Gloomberb #1091](https://github.com/gloom-sh/gloomberb/pull/1091).
 
 ```bash
 gloomberb install gloom-sh/gloom-ibkr-gateway
@@ -22,8 +22,8 @@ Flex account sync has no such limit, which is why the two are separate plugins.
 
 ## What it adds
 
-- **IBKR Console** pane: connection status, accounts, open orders, executions
-- **Trade** tab on the ticker research pane, with preview, place, modify, and cancel
+- **IBKR Console** pane: Open Orders and Executions tabs, the Gateway profile and account in the query bar, and the account's net liquidation, buying power, available funds and day P&L above the table. The footer shows the connection state and the last result. `i` and `a` open the profile and account menus; on an open order, `m` loads it into the Trade tab to modify and `c` cancels it after a confirmation.
+- **Trade** tab on the ticker research pane, with preview, place, modify, and cancel. The query bar holds the profile, account and side; the quote and net liquidation sit under it, then the order fields (contract, type, quantity, limit and stop prices), IBKR's what-if figures, and the Preview and Submit buttons. Click a field, or press Enter, to give the ticket the keyboard: `i` profile, `a` account, `b`/`v` buy or sell, `s` contract, `q` quantity, `t` type, `l` limit, `x` stop, `p` preview, Enter submit, Esc to hand the keyboard back.
 - Live quotes, price history, and instrument search sourced from Gateway
 - `Buy Selected` / `Sell Selected` commands
 

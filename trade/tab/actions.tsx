@@ -1,4 +1,5 @@
 import { useCallback, useMemo } from "react";
+import type { SelectControl } from "gloomberb/components";
 import type { DialogApi, PromptContext } from "gloomberb/dialog";
 import type { AppConfig, BrokerInstanceConfig } from "gloomberb/types/config";
 import type { TickerFinancials } from "gloomberb/types/financials";
@@ -12,7 +13,6 @@ import { isGatewayConfigured, type IbkrConfig } from "gloom-ibkr/config";
 import { ChoiceDialog, InputDialog } from "gloom-ibkr/dialogs";
 import type { ibkrGatewayManager } from "../../gateway/service";
 import { refreshGatewayData } from "../../gateway/helpers";
-import { promptIbkrAccountChoice, promptIbkrProfileChoice } from "../dialogs";
 import {
   getTradeTicketState,
   setTradeTicketBusy,
@@ -39,8 +39,10 @@ type IbkrGatewayService = ReturnType<typeof ibkrGatewayManager.getService>;
 export interface TradeTabActions {
   refresh: () => Promise<void>;
   chooseBrokerInstance: () => Promise<void>;
+  selectBrokerInstance: (instanceId: string) => void;
   chooseInstrument: () => Promise<void>;
   chooseAccount: () => Promise<void>;
+  selectAccount: (accountId: string) => void;
   editOrderType: () => Promise<void>;
   editQuantity: () => Promise<void>;
   editLimitPrice: () => Promise<void>;
@@ -53,6 +55,7 @@ export interface TradeTabActions {
 }
 
 export function useTradeTabActions({
+  accountControl,
   availableAccounts,
   brokerAccounts,
   collectionId,
@@ -66,12 +69,15 @@ export function useTradeTabActions({
   isGatewayMode,
   lockedBrokerInstanceId,
   normalizedConfig,
+  profileControl,
   selectedInstance,
   symbol,
   ticketState,
   ticker,
   tradeState,
 }: {
+  /** The query bar's account menu, opened by `a`. */
+  accountControl: { current: SelectControl | null };
   availableAccounts: BrokerAccount[];
   brokerAccounts: Record<string, BrokerAccount[]>;
   collectionId: string | null | undefined;
@@ -85,6 +91,8 @@ export function useTradeTabActions({
   isGatewayMode: boolean;
   lockedBrokerInstanceId?: string;
   normalizedConfig: IbkrConfig | null;
+  /** The query bar's profile menu, opened by `i`. */
+  profileControl: { current: SelectControl | null };
   selectedInstance?: BrokerInstanceConfig;
   symbol: string | null;
   ticketState: TradeTicketState;
@@ -140,11 +148,12 @@ export function useTradeTabActions({
       setTradeTicketMessage(symbol, undefined, "Connect a Gateway / TWS IBKR profile first.", ticker);
       return;
     }
+    profileControl.current?.open();
+  }, [gatewayInstances.length, lockedBrokerInstanceId, profileControl, symbol, ticker]);
 
-    const selected = await promptIbkrProfileChoice(dialog, gatewayInstances);
-    if (!selected) return;
-
-    const instance = getBrokerInstance(config.brokerInstances, selected);
+  const selectBrokerInstance = useCallback((instanceId: string) => {
+    if (!symbol || !ticker) return;
+    const instance = getBrokerInstance(config.brokerInstances, instanceId);
     if (!instance) return;
     updateTradingPaneState({
       brokerInstanceId: instance.id,
@@ -168,7 +177,7 @@ export function useTradeTabActions({
       lastError: undefined,
       lastInfo: undefined,
     }));
-  }, [config.brokerInstances, dialog, gatewayInstances, lockedBrokerInstanceId, symbol, ticker]);
+  }, [config.brokerInstances, symbol, ticker]);
 
   const chooseInstrument = useCallback(async () => {
     if (!symbol || !ticker) return;
@@ -246,14 +255,11 @@ export function useTradeTabActions({
       return;
     }
 
-    const selected = await promptIbkrAccountChoice(dialog, selectedInstance, nextAccounts);
-    if (!selected) return;
-    updateTradingPaneState({ accountId: selected });
-    setTradeTicketDraft(symbol, { brokerInstanceId: selectedInstance.id, accountId: selected }, ticker);
+    accountControl.current?.open();
   }, [
+    accountControl,
     availableAccounts,
     brokerAccounts,
-    dialog,
     gatewayService,
     isGatewayMode,
     normalizedConfig,
@@ -262,6 +268,12 @@ export function useTradeTabActions({
     symbol,
     ticker,
   ]);
+
+  const selectAccount = useCallback((accountId: string) => {
+    if (!symbol || !ticker || !selectedInstance) return;
+    updateTradingPaneState({ accountId });
+    setTradeTicketDraft(symbol, { brokerInstanceId: selectedInstance.id, accountId }, ticker);
+  }, [selectedInstance, symbol, ticker]);
 
   const { editNumericField, editPriceField } = useTradeFieldEditors({
     dialog,
@@ -414,8 +426,10 @@ export function useTradeTabActions({
   return useMemo(() => ({
     refresh,
     chooseBrokerInstance,
+    selectBrokerInstance,
     chooseInstrument,
     chooseAccount,
+    selectAccount,
     editOrderType,
     editQuantity,
     editLimitPrice,
@@ -436,6 +450,8 @@ export function useTradeTabActions({
     editStopPrice,
     previewOrder,
     refresh,
+    selectAccount,
+    selectBrokerInstance,
     sellOrder,
     submitOrder,
     toggleSide,

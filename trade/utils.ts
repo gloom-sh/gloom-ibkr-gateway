@@ -1,14 +1,9 @@
 import type { AppConfig } from "gloomberb/types/config";
-import type { Quote } from "gloomberb/types/financials";
 import type { BrokerContractRef } from "gloomberb/types/instrument";
 import type { TickerRecord } from "gloomberb/types/ticker";
-import type { BrokerAccount, BrokerOrderPreview, BrokerOrderType } from "gloomberb/types/trading";
-import { formatCompact, formatCurrency } from "gloomberb/utils";
-export { truncateWithEllipsis as truncateTradeText } from "gloomberb/utils";
-import { formatMarketPrice, formatMarketPriceWithCurrency, formatSignedMarketPrice, type AssetDisplayContext } from "gloomberb/market-data";
+import type { BrokerAccount, BrokerOrderType } from "gloomberb/types/trading";
+import { formatCompact } from "gloomberb/utils";
 import { getConfiguredIbkrGatewayInstances } from "gloom-ibkr/instance-selection";
-
-export type TradeTone = "neutral" | "accent" | "positive" | "negative";
 
 export function isLimitOrder(orderType: BrokerOrderType): boolean {
   return orderType === "LMT" || orderType === "STP LMT";
@@ -70,23 +65,6 @@ export function formatContractLabel(contract: BrokerContractRef): string {
   const base = contract.localSymbol || contract.symbol;
   const suffix = contract.secType ? ` ${contract.secType}` : "";
   return `${base}${suffix}`;
-}
-
-export function formatQuoteSummary(quote?: Quote, formatContext: AssetDisplayContext = {}): string {
-  if (!quote) return "No broker quote loaded";
-  const change = formatSignedMarketPrice(quote.change, formatContext);
-  const parts = [`${formatMarketPriceWithCurrency(quote.price, quote.currency, formatContext)}  ${change}`];
-  if (quote.bid != null) parts.push(`Bid ${formatMarketPrice(quote.bid, formatContext)}`);
-  if (quote.ask != null) parts.push(`Ask ${formatMarketPrice(quote.ask, formatContext)}`);
-  if (quote.bid != null && quote.ask != null) parts.push(`Spd ${formatMarketPrice(quote.ask - quote.bid, formatContext)}`);
-  return parts.join(" · ");
-}
-
-export function formatPreviewSummary(preview: BrokerOrderPreview | null): string {
-  if (!preview) {
-    return "Preview required before submit. Press p to review margin and commission.";
-  }
-  return `What-if: init ${formatCompact(preview.initMarginBefore || 0)} → ${formatCompact(preview.initMarginAfter || 0)} · commission ${preview.commission != null ? formatCurrency(preview.commission, preview.commissionCurrency || "USD") : "—"}`;
 }
 
 export function formatPreviewMetric(before?: number, after?: number): string {

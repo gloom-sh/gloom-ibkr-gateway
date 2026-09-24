@@ -9,8 +9,9 @@ jobs:
   check:
     runs-on: ubuntu-latest
     env:
-      # Shared UI/pane API from gloom-sh/gloomberb#743; update after the host release.
-      GLOOMBERB_REVISION: ffa36b68e9ae495cd7363c7081bd4fe0e4cb76b7
+      # Query bar, stat bands and title-bar tabs from gloom-sh/gloomberb#1091;
+      # update after the 0.15.0 host release.
+      GLOOMBERB_REVISION: 4172ad1f122651f980a97755d4db0c3ad5c6f0d9
       IBKR_REVISION: 6a4211667a07cb7530f0b0e8348bb41919be9501
     steps:
       - uses: actions/checkout@v4
