@@ -220,7 +220,8 @@ export function TradeTab({ focused, width, onCapture }: TickerResearchTabProps) 
   ];
   const fullMeta = [`TIF ${ticketState.draft.tif || "DAY"}`, contractName].filter(Boolean).join(" · ");
   // The terminal bar is one clipped row; context that would be cut mid-word is left out.
-  const terminalBarWidth = 2 + filters.reduce((sum, filter) => {
+  // Its cells: a padding cell each side, each filter and the gap after it, and the gap before the context.
+  const terminalBarWidth = 4 + filters.reduce((sum, filter) => {
     const choices = filter.inline
       ? filter.options.reduce((total, option) => total + displayWidth(option.label) + 2, 0)
       : displayWidth(filter.options.find((option) => option.value === filter.value)?.label ?? "");
