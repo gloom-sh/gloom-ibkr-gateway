@@ -175,14 +175,14 @@ test("prefills the cached account and edits its ticket through shared controls w
 
   const frame = testSetup!.captureCharFrame();
   expect(frame).toContain("Account DU123456");
-  expect(frame).toContain("Paper Gateway");
+  expect(frame).toContain("Profile Paper");
 
-  const row = frame.split("\n").findIndex((line) => line.includes("Qty 1"));
-  const col = frame.split("\n")[row]!.indexOf("Qty 1");
+  const row = frame.split("\n").findIndex((line) => /Qty\s+1\b/.test(line));
+  const col = frame.split("\n")[row]!.indexOf("Qty");
   await act(async () => { await testSetup!.mockMouse.click(col + 1, row); });
   await act(async () => { await testSetup!.renderOnce(); });
 
-  // The kit button must enter capture mode and open the shared TextField dialog.
+  // The ticket's field cell must enter capture mode and open the shared TextField dialog.
   // Submission uses the current input, including the final keystroke in this batch.
   await act(async () => {
     await testSetup!.mockInput.typeText(" 25 ");
@@ -191,5 +191,5 @@ test("prefills the cached account and edits its ticket through shared controls w
   await act(async () => { await testSetup!.renderOnce(); });
   expect(getTradeTicketState("AMD", ticker).draft.quantity).toBe(25);
   expect(getTradeTicketState("AMD", ticker).draft.accountId).toBe("DU123456");
-  expect(testSetup!.captureCharFrame()).toContain("Qty 25");
+  expect(testSetup!.captureCharFrame()).toMatch(/Qty\s+25\b/);
 });

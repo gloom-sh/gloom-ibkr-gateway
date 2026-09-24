@@ -1,13 +1,14 @@
-import { Box, ScrollBox } from "gloomberb/ui";
+import { Box, ScrollBox, useUiCapabilities } from "gloomberb/ui";
 import { useDialog } from "gloomberb/dialog";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   useAppSelector,
   usePaneCollection,
   usePaneInstanceId,
   usePaneTicker,
 } from "gloomberb/react";
-import { EmptyState } from "gloomberb/components";
+import { PaneStatusBody, type QueryBarSelectFilter, type SelectControl } from "gloomberb/components";
+import { displayWidth } from "gloomberb/utils";
 import type { TickerResearchTabProps } from "gloomberb/types/plugin";
 import { isGatewayConfigured } from "gloom-ibkr/config";
 import { useIbkrGatewaySelection } from "../../gateway/selection";
@@ -18,14 +19,12 @@ import {
   getTradeTicketState,
   useTradingPaneState,
 } from "../../trading/state";
+import { buildAccountFilter, buildProfileFilter } from "../filters";
 import { inferDraftAccountId, isLimitOrder, isStopOrder } from "../utils";
 import {
-  resolveTradeConnectionTone,
+  buildTradeFooterInfo,
+  buildTradeQuoteItems,
   resolveTradeContractDisplay,
-  resolveTradeNextStep,
-  resolveTradePreviewDisplay,
-  resolveTradeStatus,
-  resolveTradeTabLayout,
 } from "./model";
 import { useTradeTabFooter } from "./footer";
 import { useTradeTabActions } from "./actions";
@@ -40,7 +39,10 @@ export function TradeTab({ focused, width, onCapture }: TickerResearchTabProps) 
   const { ticker, financials } = usePaneTicker(paneId);
   const dialog = useDialog();
   const tradeState = useTradingPaneState();
+  const { nativePaneChrome } = useUiCapabilities();
   const [interactive, setInteractive] = useState(false);
+  const profileControl = useRef<SelectControl | null>(null);
+  const accountControl = useRef<SelectControl | null>(null);
 
   const symbol = ticker?.metadata.ticker ?? null;
   const ticketState = getTradeTicketState(symbol, ticker);
@@ -111,6 +113,7 @@ export function TradeTab({ focused, width, onCapture }: TickerResearchTabProps) 
   });
 
   const actions = useTradeTabActions({
+    accountControl,
     availableAccounts,
     brokerAccounts,
     collectionId,
@@ -124,6 +127,7 @@ export function TradeTab({ focused, width, onCapture }: TickerResearchTabProps) 
     isGatewayMode,
     lockedBrokerInstanceId,
     normalizedConfig,
+    profileControl,
     selectedInstance,
     symbol,
     ticketState,
@@ -153,47 +157,22 @@ export function TradeTab({ focused, width, onCapture }: TickerResearchTabProps) 
 
   const hasProfile = Boolean(selectedInstance);
   const {
-    wideLayout,
-    previewPanelWidth,
-    ticketPanelWidth,
-    fieldsPerRow,
-    fieldWidth,
-    coreFieldWidth,
-    orderFieldWidth,
-    fieldTextWidth,
-    previewTextWidth,
-    previewMetricWidth,
-  } = resolveTradeTabLayout(width);
-  const {
     activeContract,
-    hasContract,
     contractValue,
-    contractMeta,
-  } = resolveTradeContractDisplay({
-    ticketState,
-    ticker,
-    fieldTextWidth,
-    fieldsPerRow,
-  });
+    contractName,
+  } = resolveTradeContractDisplay({ ticketState, ticker });
   const hasAccount = Boolean(currentAccountId);
-  const hasPreview = Boolean(ticketState.preview);
-  const connectionTone = resolveTradeConnectionTone(gatewaySnapshot);
-  const { statusText } = resolveTradeStatus({ ticketState, gatewaySnapshot });
-  const { previewTone, previewHeading } = resolveTradePreviewDisplay(ticketState);
-  const { nextStep, workflowTone } = resolveTradeNextStep({
-    hasProfile,
-    hasContract,
-    hasAccount,
-    hasPreview,
-    editingOrderId: ticketState.editingOrderId,
-  });
-  const ticketHint = interactive
-    ? "Field shortcuts stay active while captured."
-    : "Click a field to edit. Shortcuts are in the pane footer.";
+  const footerInfo = useMemo(
+    () => buildTradeFooterInfo({ ticketState, gatewaySnapshot }),
+    [gatewaySnapshot, ticketState],
+  );
 
   useTradeTabFooter({
     actions,
     canEnterOrder: hasProfile && hasAccount,
+    enterInteractive,
+    info: footerInfo,
+    interactive,
     showLimit,
     showStop,
     symbol,
@@ -202,91 +181,97 @@ export function TradeTab({ focused, width, onCapture }: TickerResearchTabProps) 
   });
 
   if (!ticker || !symbol) {
-    return (
-      <Box flexGrow={1} alignItems="center" justifyContent="center">
-        <EmptyState title="Select a ticker to draft an IBKR trade." />
-      </Box>
-    );
+    return <PaneStatusBody empty emptyTitle="Select a ticker to draft an IBKR trade." />;
   }
 
-  return (
-    <ScrollBox flexGrow={1} scrollY>
-      <Box
-        flexDirection="column"
-        paddingX={1}
-        paddingBottom={1}
-        gap={1}
-        onMouseDown={!interactive ? enterInteractive : undefined}
-      >
-        <TradeTabHeader
-          ticker={ticker}
-          financials={financials}
-          profileLabel={selectedInstance?.label}
-          isGatewayMode={isGatewayMode}
-          connectionTone={connectionTone}
-          currentAccountId={currentAccountId}
-          lockedBrokerInstanceId={lockedBrokerInstanceId}
-          hasAccount={hasAccount}
-          activeAccount={activeAccount}
-          interactive={interactive}
-          nextStep={nextStep}
-          workflowTone={workflowTone}
-          statusText={statusText}
-          busy={ticketState.busy}
-          hasError={Boolean(ticketState.lastError)}
-          isSuccess={Boolean(ticketState.isSuccess)}
-          onEnterInteractive={enterInteractive}
-          onExitInteractive={exitInteractive}
-          onChooseBrokerInstance={() => actions.chooseBrokerInstance().catch(() => {})}
-          onChooseAccount={() => actions.chooseAccount().catch(() => {})}
-          onRefresh={() => actions.refresh().catch(() => {})}
-        />
+  const filters: QueryBarSelectFilter[] = [
+    buildProfileFilter({
+      gatewayInstances,
+      selectedInstance,
+      lockedBrokerInstanceId,
+      onChange: (instanceId) => {
+        enterInteractive();
+        actions.selectBrokerInstance(instanceId);
+      },
+      controlRef: profileControl,
+    }),
+    buildAccountFilter({
+      accounts: availableAccounts,
+      accountId: currentAccountId,
+      lockedAccountId,
+      onChange: (accountId) => {
+        enterInteractive();
+        actions.selectAccount(accountId);
+      },
+      controlRef: accountControl,
+    }),
+    {
+      id: "side",
+      label: "Side",
+      inline: true,
+      value: ticketState.draft.action,
+      options: [{ value: "BUY", label: "BUY" }, { value: "SELL", label: "SELL" }],
+      onChange: (action: string) => {
+        enterInteractive();
+        if (action === "SELL") actions.sellOrder();
+        else actions.buyOrder();
+      },
+    },
+  ];
+  const fullMeta = [`TIF ${ticketState.draft.tif || "DAY"}`, contractName].filter(Boolean).join(" · ");
+  // The terminal bar is one clipped row; context that would be cut mid-word is left out.
+  // Its cells: a padding cell each side, each filter and the gap after it, and the gap before the context.
+  const terminalBarWidth = 4 + filters.reduce((sum, filter) => {
+    const choices = filter.inline
+      ? filter.options.reduce((total, option) => total + displayWidth(option.label) + 2, 0)
+      : displayWidth(filter.options.find((option) => option.value === filter.value)?.label ?? "");
+    return sum + displayWidth(filter.label) + 1 + choices + 2;
+  }, 0);
+  const meta = nativePaneChrome || terminalBarWidth + displayWidth(fullMeta) <= width ? fullMeta : undefined;
 
-        <Box flexDirection={wideLayout ? "row" : "column"} alignItems="stretch" gap={1}>
+  return (
+    <Box flexDirection="column" flexGrow={1} width={width}>
+      <TradeTabHeader
+        width={width}
+        filters={filters}
+        meta={meta}
+        quoteItems={buildTradeQuoteItems(
+          financials?.quote,
+          { assetCategory: ticker.metadata.assetCategory },
+          activeAccount,
+        )}
+      />
+      <ScrollBox flexGrow={1} flexBasis={0} minHeight={0} scrollY focusable={false}>
+        <Box
+          flexDirection="column"
+          paddingBottom={1}
+          onMouseDown={!interactive ? enterInteractive : undefined}
+        >
           <TradeTicketPanel
-            interactive={interactive}
-            panelWidth={wideLayout ? ticketPanelWidth : undefined}
-            ticketPanelWidth={ticketPanelWidth}
-            coreFieldWidth={coreFieldWidth}
-            orderFieldWidth={orderFieldWidth}
-            fieldWidth={fieldWidth}
-            fieldTextWidth={fieldTextWidth}
-            ticketHint={ticketHint}
-            profileLabel={selectedInstance?.label}
-            hasProfile={hasProfile}
+            width={width}
+            focused={focused}
             contractValue={contractValue}
-            hasContract={hasContract}
-            currentAccountId={currentAccountId}
-            hasAccount={hasAccount}
             ticketState={ticketState}
             ticker={ticker}
             activeContract={activeContract}
             showLimit={showLimit}
             showStop={showStop}
-            contractMeta={contractMeta}
             onEnterInteractive={enterInteractive}
-            onChooseBrokerInstance={() => actions.chooseBrokerInstance().catch(() => {})}
             onChooseInstrument={() => actions.chooseInstrument().catch(() => {})}
-            onChooseAccount={() => actions.chooseAccount().catch(() => {})}
-            onToggleSide={actions.toggleSide}
             onEditOrderType={() => actions.editOrderType().catch(() => {})}
             onEditQuantity={() => actions.editQuantity().catch(() => {})}
             onEditLimitPrice={() => actions.editLimitPrice().catch(() => {})}
             onEditStopPrice={() => actions.editStopPrice().catch(() => {})}
           />
-
           <TradePreviewPanel
-            previewPanelWidth={previewPanelWidth}
-            previewTextWidth={previewTextWidth}
-            previewMetricWidth={previewMetricWidth}
-            previewTone={previewTone}
-            previewHeading={previewHeading}
+            width={width}
+            interactive={interactive}
             ticketState={ticketState}
             onPreviewOrder={() => actions.previewOrder().catch(() => {})}
             onSubmitOrder={() => actions.submitOrder().catch(() => {})}
           />
         </Box>
-      </Box>
-    </ScrollBox>
+      </ScrollBox>
+    </Box>
   );
 }

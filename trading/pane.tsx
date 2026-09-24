@@ -1,6 +1,12 @@
-import { usePaneFooter } from "gloomberb/components";
+import {
+  ConfirmDialog,
+  usePaneFooter,
+  usePaneHeaderTabs,
+  type PaneFooterSegment,
+  type SelectControl,
+} from "gloomberb/components";
 import { useShortcut } from "gloomberb/react";
-import { useDialog } from "gloomberb/dialog";
+import { useDialog, type PromptContext } from "gloomberb/dialog";
 import { useCallback, useEffect, useRef } from "react";
 import { resolveTickerFinancialsForInstrument } from "gloomberb/broker";
 import { instrumentFromTicker } from "gloomberb/market-data";
@@ -13,11 +19,11 @@ import {
 import type { PaneProps } from "gloomberb/types/plugin";
 import { isPlainKey } from "gloomberb/utils";
 import { getBrokerInstance } from "gloomberb/utils";
-import { usePluginPaneActions } from "gloomberb/react";
+import { usePluginPaneActions, usePluginPaneState } from "gloomberb/react";
 import { isGatewayConfigured } from "gloom-ibkr/config";
 import { useIbkrGatewaySelection } from "../gateway/selection";
 import { refreshGatewayData } from "../gateway/helpers";
-import { promptIbkrAccountChoice, promptIbkrProfileChoice } from "../trade/dialogs";
+import { buildAccountFilter, buildProfileFilter } from "../trade/filters";
 import {
   getTradingPaneState,
   loadOrderIntoDraft,
@@ -32,7 +38,12 @@ import {
   inferDraftAccountId,
   isMarketDataWarning,
 } from "../trade/utils";
-import { TradingPaneView } from "./pane-view";
+import {
+  buildAccountStatItems,
+  TRADING_CONSOLE_TABS,
+  TradingPaneView,
+  type TradingConsoleTab,
+} from "./pane-view";
 
 export function TradingPane({ focused, width, height }: PaneProps) {
   const dispatch = useAppDispatch();
@@ -155,18 +166,11 @@ export function TradingPane({ focused, width, height }: PaneProps) {
     refresh().catch(() => {});
   }, [selectedInstance?.id, isGatewayMode, normalizedConfig ? JSON.stringify(normalizedConfig.gateway) : ""]);
 
-  const chooseBrokerInstance = useCallback(async () => {
-    if (lockedBrokerInstanceId) {
-      setTradingMessage(undefined, "This console is locked to the active broker-managed portfolio.");
-      return;
-    }
-    if (gatewayInstances.length === 0) {
-      setTradingMessage(undefined, "Connect a Gateway / TWS IBKR profile first.");
-      return;
-    }
-    const selected = await promptIbkrProfileChoice(dialog, gatewayInstances);
-    if (!selected) return;
-    const instance = getBrokerInstance(config.brokerInstances, selected);
+  const profileControl = useRef<SelectControl | null>(null);
+  const accountControl = useRef<SelectControl | null>(null);
+
+  const selectBrokerInstance = useCallback((instanceId: string) => {
+    const instance = getBrokerInstance(config.brokerInstances, instanceId);
     if (!instance) return;
     updateTradingPaneState({
       brokerInstanceId: instance.id,
@@ -176,7 +180,19 @@ export function TradingPane({ focused, width, height }: PaneProps) {
       lastError: undefined,
       lastInfo: undefined,
     });
-  }, [dialog, gatewayInstances, lockedBrokerInstanceId, config.brokerInstances]);
+  }, [config.brokerInstances]);
+
+  const chooseBrokerInstance = useCallback(async () => {
+    if (lockedBrokerInstanceId) {
+      setTradingMessage(undefined, "This console is locked to the active broker-managed portfolio.");
+      return;
+    }
+    if (gatewayInstances.length === 0) {
+      setTradingMessage(undefined, "Connect a Gateway / TWS IBKR profile first.");
+      return;
+    }
+    profileControl.current?.open();
+  }, [gatewayInstances.length, lockedBrokerInstanceId]);
 
   const chooseAccount = useCallback(async () => {
     if (!selectedInstance || !normalizedConfig || !gatewayService || !isGatewayMode) return;
@@ -193,14 +209,26 @@ export function TradingPane({ focused, width, height }: PaneProps) {
       setTradingMessage(undefined, "No IBKR accounts available.");
       return;
     }
-
-    const selected = await promptIbkrAccountChoice(dialog, selectedInstance, nextAccounts);
-    if (!selected) return;
-    updateTradingPaneState({ accountId: selected });
-  }, [availableAccounts, brokerAccounts, dialog, gatewayService, isGatewayMode, normalizedConfig, refresh, selectedInstance]);
+    accountControl.current?.open();
+  }, [availableAccounts, brokerAccounts, gatewayService, isGatewayMode, normalizedConfig, refresh, selectedInstance]);
 
   const cancelSelectedOrder = useCallback(async () => {
     if (!selectedOrder || !selectedInstance || !normalizedConfig || !gatewayService || !isGatewayMode) return;
+    const symbol = selectedOrder.contract.localSymbol || selectedOrder.contract.symbol;
+    const confirmed = await dialog.prompt<boolean>({
+      closeOnClickOutside: true,
+      content: (ctx: PromptContext<boolean>) => (
+        <ConfirmDialog
+          {...ctx}
+          title={`Cancel order ${selectedOrder.orderId}?`}
+          body={[`${selectedOrder.action} ${selectedOrder.remaining} ${symbol}, ${selectedOrder.status}`]}
+          confirmLabel="Cancel order"
+          cancelLabel="Keep"
+          footer="Enter cancel order · Esc keep"
+        />
+      ),
+    }).catch(() => false);
+    if (confirmed !== true) return;
     try {
       setTradingBusy(true);
       await gatewayService.cancelOrder(normalizedConfig.gateway, selectedOrder.orderId);
@@ -211,7 +239,7 @@ export function TradingPane({ focused, width, height }: PaneProps) {
     } finally {
       setTradingBusy(false);
     }
-  }, [selectedOrder, selectedInstance, normalizedConfig, gatewayService, isGatewayMode, refresh]);
+  }, [dialog, selectedOrder, selectedInstance, normalizedConfig, gatewayService, isGatewayMode, refresh]);
 
   const openSelectedOrder = useCallback(() => {
     if (!selectedOrder) return;
@@ -232,47 +260,95 @@ export function TradingPane({ focused, width, height }: PaneProps) {
     switchPanel("right");
   }, [selectedOrder, tickers, paneId, selectTicker, switchTab, switchPanel]);
 
+  const hasProfile = Boolean(selectedInstance && isGatewayMode);
+  const [storedTab, setTab] = usePluginPaneState<TradingConsoleTab>("tab", "orders");
+  const tab: TradingConsoleTab = storedTab === "executions" ? "executions" : "orders";
+  // Without a profile every tab would show the same empty state.
+  const tabsInHeader = usePaneHeaderTabs(hasProfile ? {
+    tabs: TRADING_CONSOLE_TABS,
+    activeValue: tab,
+    onSelect: (value) => setTab(value as TradingConsoleTab),
+    focused,
+    keyboardNavigation: false,
+  } : null);
+  const ordersTab = hasProfile && tab === "orders";
+
   const footerActionsRef = useRef<{
     chooseBrokerInstance: () => Promise<void>;
     chooseAccount: () => Promise<void>;
     openSelectedOrder: () => void;
     cancelSelectedOrder: () => Promise<void>;
-    refresh: () => Promise<void>;
   }>({
     chooseBrokerInstance: async () => {},
     chooseAccount: async () => {},
     openSelectedOrder: () => {},
     cancelSelectedOrder: async () => {},
-    refresh: async () => {},
   });
   footerActionsRef.current = {
     chooseBrokerInstance,
     chooseAccount,
     openSelectedOrder,
     cancelSelectedOrder,
-    refresh,
   };
 
-  usePaneFooter("ibkr-trading-pane", () => ({
-    hints: [
-      { id: "profile", key: "i", label: "profile", onPress: () => footerActionsRef.current.chooseBrokerInstance().catch(() => {}) },
-      { id: "account", key: "a", label: "ccount", onPress: () => footerActionsRef.current.chooseAccount().catch(() => {}) },
-      { id: "modify", key: "m", label: "odify", onPress: () => footerActionsRef.current.openSelectedOrder() },
-      { id: "cancel", key: "c", label: "ancel", onPress: () => footerActionsRef.current.cancelSelectedOrder().catch(() => {}) },
-    ],
-  }), []);
+  const message = tradeState.lastError
+    || gatewaySnapshot.status.message
+    || gatewaySnapshot.lastError
+    || tradeState.lastInfo;
+  const messageTone = tradeState.lastError
+    ? "negative" as const
+    : isMarketDataWarning(message)
+      ? "warning" as const
+      : "muted" as const;
+
+  usePaneFooter("ibkr-trading-pane", () => {
+    // Without a profile the body already says what is missing.
+    if (!hasProfile) return { info: [], hints: [] };
+    // One segment, so a long Gateway message is cut at its end instead of squeezing the state.
+    const parts: PaneFooterSegment["parts"] = [{
+      text: displayStatusState,
+      tone: displayStatusState === "connected" ? "positive" : displayStatusState === "error" ? "negative" : "muted",
+    }];
+    if (tradeState.busy) parts.push({ text: "working...", tone: "muted" });
+    if (message) parts.push({ text: message, tone: messageTone });
+    return {
+      info: [{ id: "status", parts }],
+      hints: [
+        {
+          id: "profile",
+          key: "i",
+          label: "profile",
+          disabled: Boolean(lockedBrokerInstanceId),
+          onPress: () => footerActionsRef.current.chooseBrokerInstance().catch(() => {}),
+        },
+        { id: "account", key: "a", label: "ccount", onPress: () => footerActionsRef.current.chooseAccount().catch(() => {}) },
+        ...(ordersTab && selectedOrder ? [
+          { id: "modify", key: "m", label: "odify", onPress: () => footerActionsRef.current.openSelectedOrder() },
+          { id: "cancel", key: "c", label: "ancel", onPress: () => footerActionsRef.current.cancelSelectedOrder().catch(() => {}) },
+        ] : []),
+      ],
+    };
+  }, [displayStatusState, hasProfile, lockedBrokerInstanceId, message, messageTone, ordersTab, selectedOrder, tradeState.busy]);
 
   useShortcut((event) => {
     if (!focused) return;
     event.stopPropagation?.();
 
-    if (isPlainKey(event, "j", "down")) {
+    if (hasProfile && (isPlainKey(event, "h", "left") || isPlainKey(event, "l", "right"))) {
+      const index = TRADING_CONSOLE_TABS.findIndex((entry) => entry.value === tab);
+      const step = isPlainKey(event, "h", "left") ? -1 : 1;
+      const next = TRADING_CONSOLE_TABS[(index + step + TRADING_CONSOLE_TABS.length) % TRADING_CONSOLE_TABS.length];
+      if (next) setTab(next.value);
+      return;
+    }
+
+    if (ordersTab && isPlainKey(event, "j", "down")) {
       const nextIndex = Math.min(tradeState.selectedOpenOrderIndex + 1, Math.max(0, gatewaySnapshot.openOrders.length - 1));
       updateTradingPaneState({ selectedOpenOrderIndex: nextIndex });
       return;
     }
 
-    if (isPlainKey(event, "k", "up")) {
+    if (ordersTab && isPlainKey(event, "k", "up")) {
       const nextIndex = Math.max(0, tradeState.selectedOpenOrderIndex - 1);
       updateTradingPaneState({ selectedOpenOrderIndex: nextIndex });
       return;
@@ -291,15 +367,18 @@ export function TradingPane({ focused, width, height }: PaneProps) {
       case "m":
       case "return":
       case "enter":
-        openSelectedOrder();
+        if (ordersTab) openSelectedOrder();
         break;
       case "c":
-        cancelSelectedOrder().catch(() => {});
+        if (ordersTab) cancelSelectedOrder().catch(() => {});
         break;
     }
   });
 
   const activeAccount = availableAccounts.find((account) => account.accountId === (tradeState.accountId || ""));
+  const lockedAccountId = selectedInstance && lockedBrokerInstanceId === selectedInstance.id
+    ? activePortfolio?.brokerAccountId
+    : undefined;
   const getOrderQuote = useCallback((symbol: string) => {
     const ticker = tickers.get(symbol) ?? null;
     const instrument = instrumentFromTicker(ticker, symbol);
@@ -308,14 +387,26 @@ export function TradingPane({ focused, width, height }: PaneProps) {
 
   return (
     <TradingPaneView
-      activeAccount={activeAccount}
-      displayStatusState={displayStatusState}
-      gatewayInstancesCount={gatewayInstances.length}
+      emptyTitle={hasProfile ? undefined : gatewayRequiredMessage}
+      filters={[
+        buildProfileFilter({
+          gatewayInstances,
+          selectedInstance,
+          lockedBrokerInstanceId,
+          onChange: selectBrokerInstance,
+          controlRef: profileControl,
+        }),
+        buildAccountFilter({
+          accounts: availableAccounts,
+          accountId: tradeState.accountId,
+          lockedAccountId,
+          onChange: (accountId) => updateTradingPaneState({ accountId }),
+          controlRef: accountControl,
+        }),
+      ]}
       gatewaySnapshot={gatewaySnapshot}
       getOrderQuote={getOrderQuote}
       height={height}
-      isGatewayMode={isGatewayMode}
-      lockedBrokerInstanceId={lockedBrokerInstanceId}
       onOpenSelectedOrder={openSelectedOrder}
       onSelectExecutionSymbol={(symbol) => {
         if (tickers.has(symbol)) {
@@ -323,8 +414,11 @@ export function TradingPane({ focused, width, height }: PaneProps) {
         }
       }}
       onSelectOpenOrderIndex={(index) => updateTradingPaneState({ selectedOpenOrderIndex: index })}
-      selectedInstance={selectedInstance}
-      tradeState={tradeState}
+      onSelectTab={setTab}
+      selectedOpenOrderIndex={tradeState.selectedOpenOrderIndex}
+      statItems={buildAccountStatItems(activeAccount)}
+      tab={tab}
+      tabsInHeader={tabsInHeader}
       width={width}
       focused={focused}
     />

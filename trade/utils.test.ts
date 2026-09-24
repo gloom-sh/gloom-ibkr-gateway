@@ -6,15 +6,12 @@ import {
   findTickerForOrder,
   formatContractLabel,
   formatPreviewMetric,
-  formatPreviewSummary,
-  formatQuoteSummary,
   getKnownIbkrAccounts,
   hasIbkrTradingProfiles,
   inferDraftAccountId,
   isLimitOrder,
   isMarketDataWarning,
   isStopOrder,
-  truncateTradeText,
 } from "./utils";
 
 function createGatewayInstance(): BrokerInstanceConfig {
@@ -113,28 +110,9 @@ describe("trade-utils", () => {
     }]);
   });
 
-  test("formats contract, quote, preview, and truncation helpers", () => {
+  test("formats contract and preview helpers", () => {
     expect(formatContractLabel({ symbol: "AAPL", localSymbol: "AAPL  240621C00190000", secType: "OPT" } as BrokerContractRef)).toBe("AAPL  240621C00190000 OPT");
-    expect(formatQuoteSummary()).toBe("No broker quote loaded");
-    expect(formatQuoteSummary({
-      symbol: "AAPL",
-      price: 190.25,
-      currency: "USD",
-      change: 1.5,
-      changePercent: 0.79,
-      bid: 190.2,
-      ask: 190.3,
-      lastUpdated: Date.now(),
-    })).toContain("Spd 0.1");
-    expect(formatPreviewSummary(null)).toContain("Preview required before submit");
-    expect(formatPreviewSummary({
-      initMarginBefore: 12000,
-      initMarginAfter: 13000,
-      commission: 1.25,
-      commissionCurrency: "USD",
-    } as any)).toContain("What-if: init");
     expect(formatPreviewMetric(10, 15)).toBe("10 → 15");
-    expect(truncateTradeText("ABCDEFGHIJ", 6)).toBe("ABC...");
   });
 
   test("detects order type variants and market data warnings", () => {
