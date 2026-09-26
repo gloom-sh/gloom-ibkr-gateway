@@ -9,6 +9,7 @@ export function buildTradeOrderRequest({
   currentAccountId,
   gatewayRequiredMessage,
   isGatewayMode,
+  isCloudMode = false,
   normalizedConfig,
   selectedInstance,
   symbol,
@@ -18,6 +19,7 @@ export function buildTradeOrderRequest({
   currentAccountId?: string;
   gatewayRequiredMessage: string;
   isGatewayMode: boolean;
+  isCloudMode?: boolean;
   normalizedConfig: IbkrConfig | null;
   selectedInstance?: BrokerInstanceConfig;
   symbol: string | null;
@@ -25,7 +27,8 @@ export function buildTradeOrderRequest({
   ticker: TickerRecord | null;
 }): BrokerOrderRequest | null {
   if (!symbol || !ticker) return null;
-  if (!selectedInstance || !normalizedConfig || !isGatewayMode || !isGatewayConfigured(selectedInstance.config)) {
+  const ready = isCloudMode || (isGatewayMode && !!selectedInstance && isGatewayConfigured(selectedInstance.config));
+  if (!selectedInstance || !normalizedConfig || !ready) {
     setTradeTicketMessage(symbol, undefined, gatewayRequiredMessage, ticker);
     return null;
   }

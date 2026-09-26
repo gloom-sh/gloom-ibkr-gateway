@@ -9,7 +9,7 @@ import {
   prefillTradeFromTicker,
   removeBrokerInstanceFromTradingState,
 } from "./trading/state";
-import { getConfiguredIbkrGatewayInstances } from "gloom-ibkr/instance-selection";
+import { getConfiguredIbkrGatewayInstances, getConfiguredIbkrTradingInstances } from "gloom-ibkr/instance-selection";
 import { hasIbkrTradingProfiles } from "./trade/utils";
 import { TradeTab } from "./trade/tab";
 import { TradingPane } from "./trading/pane";
@@ -103,7 +103,7 @@ export const ibkrGatewayPlugin: GloomPlugin = {
       name: "Trade",
       order: 25,
       component: TradeTab,
-      isVisible: ({ config }) => getConfiguredIbkrGatewayInstances(config).length > 0,
+      isVisible: ({ config }) => getConfiguredIbkrTradingInstances(config).length > 0,
     });
 
     ctx.registerTickerAction({

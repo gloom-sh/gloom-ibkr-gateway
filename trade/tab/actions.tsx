@@ -9,6 +9,7 @@ import type {
   BrokerOrderType,
 } from "gloomberb/types/trading";
 import { getBrokerInstance } from "gloomberb/utils";
+import { ibkrBroker } from "gloom-ibkr/broker-adapter";
 import { isGatewayConfigured, type IbkrConfig } from "gloom-ibkr/config";
 import { ChoiceDialog, InputDialog } from "gloom-ibkr/dialogs";
 import type { ibkrGatewayManager } from "../../gateway/service";
@@ -67,6 +68,7 @@ export function useTradeTabActions({
   gatewayRequiredMessage,
   gatewayService,
   isGatewayMode,
+  isCloudMode = false,
   lockedBrokerInstanceId,
   normalizedConfig,
   profileControl,
@@ -89,6 +91,8 @@ export function useTradeTabActions({
   gatewayRequiredMessage: string;
   gatewayService: IbkrGatewayService | null;
   isGatewayMode: boolean;
+  /** A sign-in profile: orders become IBKR instructions the user submits in IBKR. */
+  isCloudMode?: boolean;
   lockedBrokerInstanceId?: string;
   normalizedConfig: IbkrConfig | null;
   /** The query bar's profile menu, opened by `i`. */
@@ -101,14 +105,16 @@ export function useTradeTabActions({
 }): TradeTabActions {
   const refresh = useCallback(async () => {
     if (!symbol || !ticker) return;
-    if (!selectedInstance || !normalizedConfig || !isGatewayMode || !isGatewayConfigured(selectedInstance.config)) {
+    const ready = isCloudMode || (isGatewayMode && !!selectedInstance && isGatewayConfigured(selectedInstance.config));
+    if (!selectedInstance || !normalizedConfig || !ready) {
       setTradeTicketMessage(symbol, undefined, gatewayRequiredMessage, ticker);
       return;
     }
 
     try {
       setTradeTicketBusy(symbol, true, ticker);
-      await refreshGatewayData(selectedInstance);
+      // Sign-in accounts arrive with the profile's own sync; only a Gateway session is refreshed here.
+      if (!isCloudMode) await refreshGatewayData(selectedInstance);
       const inferred = inferDraftAccountId(
         config,
         collectionId ?? null,
@@ -130,6 +136,7 @@ export function useTradeTabActions({
     collectionId,
     config,
     gatewayRequiredMessage,
+    isCloudMode,
     isGatewayMode,
     normalizedConfig,
     selectedInstance,
@@ -181,6 +188,10 @@ export function useTradeTabActions({
 
   const chooseInstrument = useCallback(async () => {
     if (!symbol || !ticker) return;
+    if (isCloudMode) {
+      setTradeTicketMessage(symbol, undefined, "Contract search needs a Gateway / TWS profile. This ticket uses the ticker's listing.", ticker);
+      return;
+    }
     if (!selectedInstance || !normalizedConfig || !gatewayService || !isGatewayMode || !isGatewayConfigured(selectedInstance.config)) {
       setTradeTicketMessage(symbol, undefined, gatewayRequiredMessage, ticker);
       return;
@@ -237,10 +248,11 @@ export function useTradeTabActions({
     } finally {
       setTradeTicketBusy(symbol, false, ticker);
     }
-  }, [dialog, gatewayRequiredMessage, gatewayService, isGatewayMode, normalizedConfig, selectedInstance, symbol, ticker]);
+  }, [dialog, gatewayRequiredMessage, gatewayService, isCloudMode, isGatewayMode, normalizedConfig, selectedInstance, symbol, ticker]);
 
   const chooseAccount = useCallback(async () => {
-    if (!symbol || !ticker || !selectedInstance || !normalizedConfig || !gatewayService || !isGatewayMode) return;
+    if (!symbol || !ticker || !selectedInstance || !normalizedConfig) return;
+    if (!isCloudMode && (!gatewayService || !isGatewayMode)) return;
     if (availableAccounts.length === 0) {
       await refresh();
     }
@@ -248,7 +260,7 @@ export function useTradeTabActions({
     const nextAccounts = getKnownIbkrAccounts(
       brokerAccounts,
       selectedInstance.id,
-      gatewayService.getSnapshot().accounts,
+      isCloudMode ? [] : gatewayService!.getSnapshot().accounts,
     );
     if (nextAccounts.length === 0) {
       setTradeTicketMessage(symbol, undefined, "No IBKR accounts available.", ticker);
@@ -261,6 +273,7 @@ export function useTradeTabActions({
     availableAccounts,
     brokerAccounts,
     gatewayService,
+    isCloudMode,
     isGatewayMode,
     normalizedConfig,
     refresh,
@@ -311,6 +324,7 @@ export function useTradeTabActions({
     currentAccountId,
     gatewayRequiredMessage,
     isGatewayMode,
+    isCloudMode,
     normalizedConfig,
     selectedInstance,
     symbol,
@@ -319,6 +333,7 @@ export function useTradeTabActions({
   }), [
     currentAccountId,
     gatewayRequiredMessage,
+    isCloudMode,
     isGatewayMode,
     normalizedConfig,
     selectedInstance,
@@ -329,27 +344,39 @@ export function useTradeTabActions({
 
   const previewOrder = useCallback(async () => {
     const request = draftRequest();
-    if (!request || !symbol || !ticker || !selectedInstance || !normalizedConfig || !gatewayService) return;
+    if (!request || !symbol || !ticker || !selectedInstance || !normalizedConfig) return;
+    if (!isCloudMode && !gatewayService) return;
 
     try {
       setTradeTicketBusy(symbol, true, ticker);
-      await gatewayService.connect(normalizedConfig.gateway);
-      const preview = await gatewayService.previewOrder(normalizedConfig.gateway, request);
+      let preview;
+      if (isCloudMode) {
+        preview = await ibkrBroker.previewOrder!(selectedInstance, request);
+      } else {
+        await gatewayService!.connect(normalizedConfig.gateway);
+        preview = await gatewayService!.previewOrder(normalizedConfig.gateway, request);
+      }
       updateTradingPaneState({ accountId: request.accountId });
       setTradeTicketDraft(symbol, { brokerInstanceId: selectedInstance.id, accountId: request.accountId }, ticker);
       setTradeTicketPreview(symbol, preview, ticker);
-      setTradeTicketMessage(symbol, "Review the what-if preview, then submit when ready.", undefined, ticker);
+      setTradeTicketMessage(
+        symbol,
+        isCloudMode ? "Send it to IBKR, then review and submit it there." : "Review the what-if preview, then submit when ready.",
+        undefined,
+        ticker,
+      );
     } catch (error: any) {
       const message = error?.message || "Failed to preview order.";
       setTradeTicketMessage(symbol, undefined, message.replace("Timeout has occurred", "Preview timed out — try again."), ticker);
     } finally {
       setTradeTicketBusy(symbol, false, ticker);
     }
-  }, [draftRequest, gatewayService, normalizedConfig, selectedInstance, symbol, ticker]);
+  }, [draftRequest, gatewayService, isCloudMode, normalizedConfig, selectedInstance, symbol, ticker]);
 
   const submitOrder = useCallback(async () => {
     const request = draftRequest();
-    if (!request || !symbol || !ticker || !selectedInstance || !normalizedConfig || !gatewayService) return;
+    if (!request || !symbol || !ticker || !selectedInstance || !normalizedConfig) return;
+    if (!isCloudMode && !gatewayService) return;
     if (!ticketState.preview) {
       await previewOrder();
       return;
@@ -357,13 +384,20 @@ export function useTradeTabActions({
 
     try {
       setTradeTicketBusy(symbol, true, ticker);
-      await gatewayService.connect(normalizedConfig.gateway);
       let successMessage: string;
+      if (isCloudMode) {
+        // IBKR opens the instruction in the browser; nothing is live until the user submits it there.
+        await ibkrBroker.placeOrder!(selectedInstance, request);
+        setTradeTicketPreview(symbol, null, ticker);
+        setTradeTicketMessage(symbol, "Sent to IBKR. Review and submit it there.", undefined, ticker, true);
+        return;
+      }
+      await gatewayService!.connect(normalizedConfig.gateway);
       if (ticketState.editingOrderId) {
-        await gatewayService.modifyOrder(normalizedConfig.gateway, ticketState.editingOrderId, request);
+        await gatewayService!.modifyOrder(normalizedConfig.gateway, ticketState.editingOrderId, request);
         successMessage = `Modified order ${ticketState.editingOrderId}.`;
       } else {
-        const order = await gatewayService.placeOrder(normalizedConfig.gateway, request);
+        const order = await gatewayService!.placeOrder(normalizedConfig.gateway, request);
         successMessage = `Submitted order ${order.orderId}.`;
       }
       setTradeTicketPreview(symbol, null, ticker);
@@ -378,6 +412,7 @@ export function useTradeTabActions({
   }, [
     draftRequest,
     gatewayService,
+    isCloudMode,
     normalizedConfig,
     previewOrder,
     refresh,
