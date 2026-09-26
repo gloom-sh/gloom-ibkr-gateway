@@ -3,7 +3,7 @@
   "name": "IBKR Gateway",
   "icon": "icon.svg",
   "tagline": "Live IBKR data, trading console, and order entry",
-  "description": "Live market data, the trading console, and order entry through IBKR Gateway or TWS. The Trade tab also sends orders from IBKR sign-in profiles, which open in IBKR for review. Requires the Interactive Brokers plugin, which owns the broker profile. Speaks the TWS API over a local TCP socket, so it runs in the terminal and the desktop app, not on the web.",
+  "description": "Live market data, the trading console, and order entry through IBKR Gateway or TWS. Requires the Interactive Brokers plugin, which owns the broker profile. Speaks the TWS API over a local TCP socket, so it runs in the terminal and the desktop app, not on the web.",
   "categories": [
     "broker",
     "trading"
@@ -19,5 +19,5 @@
       "ibkr-trading"
     ]
   },
-  "minGloom": "0.15.3"
+  "minGloom": "0.15.0"
 }

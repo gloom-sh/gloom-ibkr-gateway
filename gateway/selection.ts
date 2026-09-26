@@ -5,7 +5,6 @@ import { normalizeIbkrConfig } from "gloom-ibkr/config";
 import { ibkrGatewayManager } from "./service";
 import {
   getConfiguredIbkrGatewayInstances,
-  getConfiguredIbkrTradingInstances,
   getLockedIbkrTradingInstanceId,
   resolveIbkrTradingInstanceId,
 } from "gloom-ibkr/instance-selection";
@@ -20,20 +19,16 @@ export function useIbkrGatewaySelection(
   brokerAccounts: Record<string, BrokerAccount[]>,
   collectionId: string | null | undefined,
   preferredInstanceId?: string,
-  { includeCloud = false }: { includeCloud?: boolean } = {},
 ) {
   const activePortfolio = config.portfolios.find((portfolio) => portfolio.id === collectionId);
-  // The Trade tab also takes sign-in profiles, whose orders open in IBKR for review; the console needs a Gateway.
-  const gatewayInstances = includeCloud ? getConfiguredIbkrTradingInstances(config) : getConfiguredIbkrGatewayInstances(config);
-  const lockedBrokerInstanceId = getLockedIbkrTradingInstanceId(config, collectionId ?? null, { includeCloud });
-  const selectedBrokerInstanceId = resolveIbkrTradingInstanceId(config, collectionId ?? null, preferredInstanceId, { includeCloud });
+  const gatewayInstances = getConfiguredIbkrGatewayInstances(config);
+  const lockedBrokerInstanceId = getLockedIbkrTradingInstanceId(config, collectionId ?? null);
+  const selectedBrokerInstanceId = resolveIbkrTradingInstanceId(config, collectionId ?? null, preferredInstanceId);
   const selectedInstance = getBrokerInstance(config.brokerInstances, selectedBrokerInstanceId);
+  const gatewaySnapshot = useGatewaySnapshot(selectedBrokerInstanceId);
+  const gatewayService = selectedBrokerInstanceId ? ibkrGatewayManager.getService(selectedBrokerInstanceId) : null;
   const normalizedConfig = selectedInstance ? normalizeIbkrConfig(selectedInstance.config) : null;
   const isGatewayMode = selectedInstance != null && normalizedConfig?.connectionMode === "gateway";
-  const isCloudMode = selectedInstance != null && normalizedConfig?.connectionMode === "cloud";
-  const gatewayInstanceId = isCloudMode ? undefined : selectedBrokerInstanceId;
-  const gatewaySnapshot = useGatewaySnapshot(gatewayInstanceId);
-  const gatewayService = gatewayInstanceId ? ibkrGatewayManager.getService(gatewayInstanceId) : null;
   const availableAccounts = getKnownIbkrAccounts(
     brokerAccounts,
     selectedBrokerInstanceId,
@@ -50,8 +45,7 @@ export function useIbkrGatewaySelection(
     gatewayService,
     normalizedConfig,
     isGatewayMode,
-    isCloudMode,
     availableAccounts,
-    gatewayRequiredMessage: getGatewayRequiredMessage(gatewayInstances.length, includeCloud),
+    gatewayRequiredMessage: getGatewayRequiredMessage(gatewayInstances.length),
   };
 }

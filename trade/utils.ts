@@ -3,7 +3,7 @@ import type { BrokerContractRef } from "gloomberb/types/instrument";
 import type { TickerRecord } from "gloomberb/types/ticker";
 import type { BrokerAccount, BrokerOrderType } from "gloomberb/types/trading";
 import { formatCompact } from "gloomberb/utils";
-import { getConfiguredIbkrTradingInstances } from "gloom-ibkr/instance-selection";
+import { getConfiguredIbkrGatewayInstances } from "gloom-ibkr/instance-selection";
 
 export function isLimitOrder(orderType: BrokerOrderType): boolean {
   return orderType === "LMT" || orderType === "STP LMT";
@@ -14,7 +14,7 @@ export function isStopOrder(orderType: BrokerOrderType): boolean {
 }
 
 export function hasIbkrTradingProfiles(appConfig: AppConfig): boolean {
-  return getConfiguredIbkrTradingInstances(appConfig).length > 0;
+  return getConfiguredIbkrGatewayInstances(appConfig).length > 0;
 }
 
 export function inferDraftAccountId(
