@@ -14,7 +14,6 @@ export function useTradeTicketSync({
   collectionId,
   config,
   isGatewayMode,
-  isCloudMode = false,
   lockedAccountId,
   selectedInstance,
   symbol,
@@ -26,7 +25,6 @@ export function useTradeTicketSync({
   collectionId: string | null | undefined;
   config: AppConfig;
   isGatewayMode: boolean;
-  isCloudMode?: boolean;
   lockedAccountId?: string;
   selectedInstance?: BrokerInstanceConfig;
   symbol: string | null;
@@ -63,7 +61,7 @@ export function useTradeTicketSync({
   ]);
 
   useEffect(() => {
-    if (!symbol || !ticker || !(isGatewayMode || isCloudMode) || availableAccounts.length === 0 || ticketState.draft.accountId || !selectedInstance) return;
+    if (!symbol || !ticker || !isGatewayMode || availableAccounts.length === 0 || ticketState.draft.accountId || !selectedInstance) return;
     const inferred = inferDraftAccountId(
       config,
       collectionId ?? null,
@@ -78,7 +76,6 @@ export function useTradeTicketSync({
     availableAccounts,
     collectionId,
     config,
-    isCloudMode,
     isGatewayMode,
     selectedInstance,
     symbol,

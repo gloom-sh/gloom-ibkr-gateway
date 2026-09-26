@@ -1,6 +1,6 @@
 {
   "name": "gloom-ibkr-gateway",
-  "version": "1.2.0",
+  "version": "1.1.0",
   "description": "Live IBKR market data, trading console, and order entry through Gateway or TWS",
   "type": "module",
   "main": "index.tsx",
@@ -19,8 +19,8 @@
     "rxjs": "^7.8.1"
   },
   "peerDependencies": {
-    "gloomberb": ">=0.15.3",
-    "gloom-ibkr": ">=1.2.0",
+    "gloomberb": ">=0.15.0",
+    "gloom-ibkr": ">=1.1.0",
     "react": ">=19"
   },
   "peerDependenciesMeta": {

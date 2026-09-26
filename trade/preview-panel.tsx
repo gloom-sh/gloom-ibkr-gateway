@@ -8,21 +8,18 @@ export function TradePreviewPanel({
   width,
   interactive,
   ticketState,
-  reviewAtBroker = false,
   onPreviewOrder,
   onSubmitOrder,
 }: {
   width: number;
   interactive: boolean;
   ticketState: TradeTicketState;
-  /** A sign-in profile: the order opens in IBKR, where the user reviews and submits it. */
-  reviewAtBroker?: boolean;
   onPreviewOrder: () => void;
   onSubmitOrder: () => void;
 }) {
   return (
     <>
-      <StatGrid items={buildTradePreviewItems(ticketState.preview, { reviewAtBroker })} width={width} />
+      <StatGrid items={buildTradePreviewItems(ticketState.preview)} width={width} />
       <Box flexDirection="row" gap={1} paddingX={1} marginTop={1}>
         <Button
           label="Preview"
@@ -32,7 +29,7 @@ export function TradePreviewPanel({
           onPress={onPreviewOrder}
         />
         <Button
-          label={ticketState.editingOrderId ? "Submit Change" : reviewAtBroker ? "Send to IBKR" : "Submit Order"}
+          label={ticketState.editingOrderId ? "Submit Change" : "Submit Order"}
           variant="primary"
           shortcut={interactive ? "Enter" : undefined}
           disabled={!ticketState.preview || ticketState.busy}

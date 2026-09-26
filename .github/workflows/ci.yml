@@ -11,8 +11,8 @@ jobs:
     env:
       # Query bar, stat bands and title-bar tabs from gloom-sh/gloomberb#1091;
       # update after the 0.15.0 host release.
-      GLOOMBERB_REVISION: e3763c007a9201104246d4e7d51eadb729b94607
-      IBKR_REVISION: 9b92892d27d276dc94f76f5761cd448318da7588
+      GLOOMBERB_REVISION: 4172ad1f122651f980a97755d4db0c3ad5c6f0d9
+      IBKR_REVISION: 6a4211667a07cb7530f0b0e8348bb41919be9501
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
