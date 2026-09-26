@@ -1,6 +1,6 @@
 {
   "name": "gloom-ibkr-gateway",
-  "version": "1.1.0",
+  "version": "1.2.1",
   "description": "Live IBKR market data, trading console, and order entry through Gateway or TWS",
   "type": "module",
   "main": "index.tsx",
