@@ -15,7 +15,12 @@ export function useGatewaySnapshot(instanceId?: string) {
   return useSyncExternalStore(subscribe, getSnapshot);
 }
 
-export function getGatewayRequiredMessage(instanceCount: number) {
+export function getGatewayRequiredMessage(instanceCount: number, includeCloud = false) {
+  if (includeCloud) {
+    return instanceCount > 0
+      ? "Choose an IBKR profile first."
+      : "Add an IBKR sign-in or Gateway / TWS profile first.";
+  }
   return instanceCount > 0
     ? "Choose a Gateway / TWS IBKR profile first."
     : "Connect a Gateway / TWS IBKR profile first.";

@@ -56,6 +56,7 @@ export function TradeTab({ focused, width, onCapture }: TickerResearchTabProps) 
     gatewayService,
     normalizedConfig,
     isGatewayMode,
+    isCloudMode,
     availableAccounts,
     gatewayRequiredMessage,
   } = useIbkrGatewaySelection(
@@ -63,6 +64,7 @@ export function TradeTab({ focused, width, onCapture }: TickerResearchTabProps) 
     brokerAccounts,
     collectionId,
     preferredInstanceId,
+    { includeCloud: true },
   );
   const inferredAccountId = selectedInstance
     ? inferDraftAccountId(
@@ -104,6 +106,7 @@ export function TradeTab({ focused, width, onCapture }: TickerResearchTabProps) 
     collectionId,
     config,
     isGatewayMode,
+    isCloudMode,
     lockedAccountId,
     selectedInstance,
     symbol,
@@ -125,6 +128,7 @@ export function TradeTab({ focused, width, onCapture }: TickerResearchTabProps) 
     gatewayRequiredMessage,
     gatewayService,
     isGatewayMode,
+    isCloudMode,
     lockedBrokerInstanceId,
     normalizedConfig,
     profileControl,
@@ -267,6 +271,7 @@ export function TradeTab({ focused, width, onCapture }: TickerResearchTabProps) 
             width={width}
             interactive={interactive}
             ticketState={ticketState}
+            reviewAtBroker={isCloudMode}
             onPreviewOrder={() => actions.previewOrder().catch(() => {})}
             onSubmitOrder={() => actions.submitOrder().catch(() => {})}
           />

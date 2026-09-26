@@ -9,7 +9,7 @@ import {
   prefillTradeFromTicker,
   removeBrokerInstanceFromTradingState,
 } from "./trading/state";
-import { getConfiguredIbkrGatewayInstances } from "gloom-ibkr/instance-selection";
+import { getConfiguredIbkrGatewayInstances, getConfiguredIbkrTradingInstances } from "gloom-ibkr/instance-selection";
 import { hasIbkrTradingProfiles } from "./trade/utils";
 import { TradeTab } from "./trade/tab";
 import { TradingPane } from "./trading/pane";
@@ -44,7 +44,7 @@ function openTradeForSymbol(
 export const ibkrGatewayPlugin: GloomPlugin = {
   id: "ibkr-gateway",
   name: "IBKR Gateway",
-  version: "1.1.0",
+  version: "1.2.0",
   description: "Live market data, the trading console, and order entry through IBKR Gateway or TWS.",
   homepage: "https://github.com/gloom-sh/gloom-ibkr-gateway",
   toggleable: true,
@@ -103,7 +103,7 @@ export const ibkrGatewayPlugin: GloomPlugin = {
       name: "Trade",
       order: 25,
       component: TradeTab,
-      isVisible: ({ config }) => getConfiguredIbkrGatewayInstances(config).length > 0,
+      isVisible: ({ config }) => getConfiguredIbkrTradingInstances(config).length > 0,
     });
 
     ctx.registerTickerAction({

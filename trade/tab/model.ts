@@ -76,7 +76,14 @@ export function buildTradeQuoteItems(
 }
 
 /** What IBKR's what-if check says the order would cost; dashes until a preview has run. */
-export function buildTradePreviewItems(preview: BrokerOrderPreview | null): StatItem[] {
+export function buildTradePreviewItems(
+  preview: BrokerOrderPreview | null,
+  { reviewAtBroker = false }: { reviewAtBroker?: boolean } = {},
+): StatItem[] {
+  // IBKR prices margin and fees when the user reviews the order there, so there is no what-if here.
+  if (reviewAtBroker) {
+    return [{ id: "review", label: "Review", value: preview?.warningText ?? "Opens in IBKR to submit", wide: true }];
+  }
   const items: StatItem[] = [
     {
       id: "fee",
