@@ -10,6 +10,7 @@ import {
   removeBrokerInstanceFromTradingState,
 } from "./trading/state";
 import { getConfiguredIbkrGatewayInstances } from "gloom-ibkr/instance-selection";
+import { isFuturesGenericTicker } from "./trade/generic";
 import { hasIbkrTradingProfiles } from "./trade/utils";
 import { TradeTab } from "./trade/tab";
 import { TradingPane } from "./trading/pane";
@@ -29,6 +30,10 @@ function openTradeForSymbol(
 ) {
   const ticker = ctx.getTicker(symbol);
   if (!ticker) return;
+  if (isFuturesGenericTicker(ticker.metadata.ticker)) {
+    ctx.notify({ body: `${ticker.metadata.ticker} is a generic series, not a contract. Trade a listed month instead.`, type: "info" });
+    return;
+  }
 
   if (action) {
     prefillTradeFromTicker(ticker, action);
@@ -103,14 +108,16 @@ export const ibkrGatewayPlugin: GloomPlugin = {
       name: "Trade",
       order: 25,
       component: TradeTab,
-      isVisible: ({ config }) => getConfiguredIbkrGatewayInstances(config).length > 0,
+      // A generic future (CL1) rolls between contracts; there is nothing to trade.
+      isVisible: ({ config, ticker }) => getConfiguredIbkrGatewayInstances(config).length > 0
+        && !isFuturesGenericTicker(ticker?.metadata.ticker),
     });
 
     ctx.registerTickerAction({
       id: "ibkr-trade",
       label: "Trade",
       keywords: ["trade", "buy", "sell", "ibkr"],
-      filter: () => hasIbkrTradingProfiles(ctx.getConfig()),
+      filter: (ticker) => hasIbkrTradingProfiles(ctx.getConfig()) && !isFuturesGenericTicker(ticker.metadata.ticker),
       execute: async (ticker) => {
         if (!ensureIbkrTradingProfile(ctx)) return;
         openTradeForSymbol(ctx, ticker.metadata.ticker);
