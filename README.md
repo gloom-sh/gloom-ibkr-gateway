@@ -22,7 +22,7 @@ Flex account sync has no such limit, which is why the two are separate plugins.
 
 ## What it adds
 
-- **IBKR Console** pane: Open Orders and Executions tabs, the Gateway profile and account in the query bar, and the account's net liquidation, buying power, available funds and day P&L above the table. The footer shows the connection state and the last result. `i` and `a` open the profile and account menus; on an open order, `m` loads it into the Trade tab to modify and `c` cancels it after a confirmation.
+- **IBKR Console** pane: Open Orders and Executions tabs, the Gateway profile and account in the query bar, and the account's net liquidation, buying power, available funds and day P&L above the table. The footer shows the connection state and the last refresh. `i` and `a` open the profile and account menus; on an open order, `m` loads it into the Trade tab to modify and `c` cancels it after a confirmation. A cancel or modify that fails says so in the order's STATUS, with the reason under the table while the order is selected.
 - **Trade** tab on the ticker research pane, with preview, place, modify, and cancel. The query bar holds the profile, account and side; the quote and net liquidation sit under it, then the order fields (contract, type, quantity, limit and stop prices), IBKR's what-if figures, and the Preview and Submit buttons. Click a field, or press Enter, to give the ticket the keyboard: `i` profile, `a` account, `b`/`v` buy or sell, `s` contract, `q` quantity, `t` type, `l` limit, `x` stop, `p` preview, Enter submit, Esc to hand the keyboard back.
 - Live quotes, price history, and instrument search sourced from Gateway
 - `Buy Selected` / `Sell Selected` commands

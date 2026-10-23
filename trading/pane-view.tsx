@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { Box, TextAttributes } from "gloomberb/ui";
 import {
   DataTableView,
+  Notice,
   PaneStatusBody,
   QueryBar,
   StatGrid,
@@ -18,8 +19,19 @@ import { formatCurrency } from "gloomberb/utils";
 import { formatMarketPrice, formatMarketQuantity } from "gloomberb/market-data";
 import type { IbkrSnapshot } from "gloom-ibkr/gateway-types";
 
-type OpenOrder = IbkrSnapshot["openOrders"][number];
+export type OpenOrder = IbkrSnapshot["openOrders"][number];
 type Execution = IbkrSnapshot["executions"][number];
+
+/**
+ * What a cancel or a modify sent from the console came to, on the order's row
+ * while it is listed: `status` in STATUS, `text` under the table while the row
+ * is selected (the table has no detail: Enter loads the order into a ticket).
+ */
+export interface OrderNote {
+  status: string;
+  text?: string;
+  tone: "warning" | "negative";
+}
 
 export type TradingConsoleTab = "orders" | "executions";
 
@@ -32,7 +44,8 @@ const OPEN_ORDER_COLUMNS: DataTableColumn[] = [
   { id: "orderId", label: "ID", width: 7, align: "left" },
   { id: "action", label: "SIDE", width: 5, align: "left" },
   { id: "symbol", label: "SYMBOL", width: 14, align: "left", flexGrow: 1 },
-  { id: "status", label: "STATUS", width: 10, align: "left" },
+  // Wide enough for IBKR's PendingCancel and a note such as Cancel failed.
+  { id: "status", label: "STATUS", width: 13, align: "left" },
   { id: "remaining", label: "QTY", width: 6, align: "right" },
   { id: "price", label: "PRICE", width: 9, align: "right" },
   { id: "bid", label: "BID", width: 8, align: "right" },
@@ -76,6 +89,7 @@ function renderOpenOrderCell(
   order: OpenOrder,
   column: DataTableColumn,
   getOrderQuote: (symbol: string) => Quote | null,
+  note: OrderNote | null,
 ): DataTableCell {
   const secType = order.contract.secType;
   switch (column.id) {
@@ -86,7 +100,9 @@ function renderOpenOrderCell(
     case "symbol":
       return { text: order.contract.localSymbol || order.contract.symbol, color: colors.text, attributes: TextAttributes.BOLD };
     case "status":
-      return { text: order.status, color: colors.textDim };
+      return note
+        ? { text: note.status, color: note.tone === "negative" ? colors.negative : colors.warning }
+        : { text: order.status, color: colors.textDim };
     case "remaining":
       return { text: formatMarketQuantity(order.remaining, { contractSecType: secType, maxWidth: 6 }), color: colors.text };
     case "price":
@@ -139,6 +155,7 @@ export function TradingPaneView({
   onSelectExecutionSymbol,
   onSelectOpenOrderIndex,
   onSelectTab,
+  noteFor = () => null,
   selectedOpenOrderIndex,
   statItems,
   tab,
@@ -156,6 +173,8 @@ export function TradingPaneView({
   onSelectExecutionSymbol: (symbol: string) => void;
   onSelectOpenOrderIndex: (index: number) => void;
   onSelectTab: (tab: TradingConsoleTab) => void;
+  /** What a cancel or a modify came to, for an order's row. */
+  noteFor?: (order: OpenOrder) => OrderNote | null;
   selectedOpenOrderIndex: number;
   statItems: StatItem[];
   tab: TradingConsoleTab;
@@ -163,6 +182,8 @@ export function TradingPaneView({
   width: number;
   focused?: boolean;
 }) {
+  const selectedOrder = gatewaySnapshot.openOrders[selectedOpenOrderIndex];
+  const selectedNote = selectedOrder ? noteFor(selectedOrder) : null;
   const executions = useMemo(
     () => gatewaySnapshot.executions.slice(0, 20),
     [gatewaySnapshot.executions],
@@ -205,7 +226,7 @@ export function TradingPaneView({
           sortColumnId={null}
           sortDirection="asc"
           getItemKey={(order) => String(order.orderId)}
-          renderCell={(order, column) => renderOpenOrderCell(order, column, getOrderQuote)}
+          renderCell={(order, column) => renderOpenOrderCell(order, column, getOrderQuote, noteFor(order))}
           selection={{
             kind: "index",
             selectedIndex: selectedOpenOrderIndex,
@@ -213,6 +234,11 @@ export function TradingPaneView({
           }}
           onActivate={onOpenSelectedOrder}
           emptyStateTitle="No open IBKR orders."
+          rootAfter={selectedNote?.text ? (
+            <Box paddingX={1} flexShrink={0}>
+              <Notice tone={selectedNote.tone}>{selectedNote.text}</Notice>
+            </Box>
+          ) : undefined}
         />
       ) : (
         <DataTableView<Execution>
