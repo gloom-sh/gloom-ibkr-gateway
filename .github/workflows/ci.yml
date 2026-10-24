@@ -11,7 +11,7 @@ jobs:
     env:
       # `useRowNotes`, which the console's order rows use, from the host's
       # row-message change; move to its merge commit, then to the 0.18.4 release.
-      GLOOMBERB_REVISION: a0b45906e6c0b8dd0e877368ede09506561c2e80
+      GLOOMBERB_REVISION: 2954ecd24f9ab949cceccd99fe8316c28d470742
       IBKR_REVISION: 6a4211667a07cb7530f0b0e8348bb41919be9501
     steps:
       - uses: actions/checkout@v4
