@@ -223,6 +223,7 @@ test("remote gateway snapshots are side-effect-free", async () => {
     getStatus: () => status,
     subscribeStatus: () => () => {},
     subscribeQuotes: () => () => {},
+    subscribeOrders: () => () => {},
     removeInstance: async () => {},
     destroyAll: async () => {},
   };

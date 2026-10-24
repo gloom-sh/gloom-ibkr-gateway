@@ -2,6 +2,7 @@ import {
   ConfirmDialog,
   usePaneFooter,
   usePaneHeaderTabs,
+  useRowNotes,
   type PaneFooterSegment,
   type SelectControl,
 } from "gloomberb/components";
@@ -19,7 +20,7 @@ import {
 import type { PaneProps } from "gloomberb/types/plugin";
 import { isPlainKey } from "gloomberb/utils";
 import { getBrokerInstance } from "gloomberb/utils";
-import { usePluginPaneActions, usePluginPaneState } from "gloomberb/react";
+import { usePluginAppActions, usePluginPaneActions, usePluginPaneState } from "gloomberb/react";
 import { isGatewayConfigured } from "gloom-ibkr/config";
 import { useIbkrGatewaySelection } from "../gateway/selection";
 import { refreshGatewayData } from "../gateway/helpers";
@@ -42,8 +43,14 @@ import {
   buildAccountStatItems,
   TRADING_CONSOLE_TABS,
   TradingPaneView,
+  type OpenOrder,
+  type OrderNote,
   type TradingConsoleTab,
 } from "./pane-view";
+
+const orderKey = (order: OpenOrder) => String(order.orderId);
+/** The order's state as IBKR reports it: a later one is newer news than a note about a cancel or a modify. */
+const orderSignature = (order: OpenOrder) => order.status;
 
 export function TradingPane({ focused, width, height }: PaneProps) {
   const dispatch = useAppDispatch();
@@ -53,6 +60,7 @@ export function TradingPane({ focused, width, height }: PaneProps) {
   const paneId = usePaneInstanceId();
   const { collectionId } = usePaneCollection(paneId);
   const { selectTicker, switchTab, switchPanel } = usePluginPaneActions();
+  const { notify } = usePluginAppActions();
   const dialog = useDialog();
   const tradeState = useTradingPaneState();
   const {
@@ -77,6 +85,16 @@ export function TradingPane({ focused, width, height }: PaneProps) {
     ? "connected"
     : gatewaySnapshot.status.state;
   const selectedOrder = gatewaySnapshot.openOrders[tradeState.selectedOpenOrderIndex] ?? null;
+  // What a cancel or a modify came to is said on the order's row while it is listed, and a toast once it has left.
+  const { noteFor, setNote, clearNotes } = useRowNotes<OpenOrder, OrderNote>(gatewaySnapshot.openOrders, {
+    key: orderKey,
+    signature: orderSignature,
+  });
+  const listed = useCallback((orderId: number) => (
+    gatewayService?.getSnapshot().openOrders.some((order) => order.orderId === orderId) ?? false
+  ), [gatewayService]);
+  // Another profile lists other orders.
+  useEffect(() => { clearNotes(); }, [clearNotes, selectedInstance?.id]);
 
   useEffect(() => {
     if (!focused) return;
@@ -125,7 +143,8 @@ export function TradingPane({ focused, width, height }: PaneProps) {
     }
   }, [isGatewayMode, availableAccounts, tradeState.accountId, config, collectionId, selectedInstance]);
 
-  const refresh = useCallback(async () => {
+  /** Reads the profile again; `quiet` after an order action, whose result its row says. */
+  const refresh = useCallback(async (quiet = false) => {
     if (!selectedInstance || !normalizedConfig || !isGatewayMode || !isGatewayConfigured(selectedInstance.config)) {
       setTradingMessage(undefined, gatewayRequiredMessage);
       return;
@@ -144,7 +163,7 @@ export function TradingPane({ focused, width, height }: PaneProps) {
       if (inferred && !getTradingPaneState().accountId) {
         updateTradingPaneState({ accountId: inferred });
       }
-      setTradingMessage(`Refreshed ${selectedInstance.label}.`, undefined);
+      if (!quiet) setTradingMessage(`Refreshed ${selectedInstance.label}.`, undefined);
     } catch (error: any) {
       setTradingMessage(undefined, error?.message || `Failed to refresh ${selectedInstance.label}.`);
     } finally {
@@ -229,36 +248,51 @@ export function TradingPane({ focused, width, height }: PaneProps) {
       ),
     }).catch(() => false);
     if (confirmed !== true) return;
+    const order = selectedOrder;
+    const key = orderKey(order);
+    setNote(key, { status: "Cancelling…", tone: "warning" });
     try {
-      setTradingBusy(true);
-      await gatewayService.cancelOrder(normalizedConfig.gateway, selectedOrder.orderId);
-      setTradingMessage(`Cancelled order ${selectedOrder.orderId}.`, undefined);
-      await refresh();
+      await gatewayService.cancelOrder(normalizedConfig.gateway, order.orderId);
     } catch (error: any) {
-      setTradingMessage(undefined, error?.message || "Failed to cancel order.");
-    } finally {
-      setTradingBusy(false);
+      const reason = error?.message || `Failed to cancel order ${order.orderId}.`;
+      if (listed(order.orderId)) {
+        setNote(key, { status: "Cancel failed", text: reason, tone: "negative" });
+      } else {
+        setNote(key, null);
+        notify({ body: reason, type: "error" });
+      }
+      return;
     }
-  }, [dialog, selectedOrder, selectedInstance, normalizedConfig, gatewayService, isGatewayMode, refresh]);
+    // From here IBKR's own status (PendingCancel, Cancelled) says it; an order that has left the list needs a toast.
+    setNote(key, null);
+    await refresh(true);
+    if (!listed(order.orderId)) notify({ body: `Cancelled order ${order.orderId}.`, type: "success" });
+  }, [dialog, selectedOrder, selectedInstance, normalizedConfig, gatewayService, isGatewayMode, refresh, setNote, listed, notify]);
 
   const openSelectedOrder = useCallback(() => {
     if (!selectedOrder) return;
+    const key = orderKey(selectedOrder);
     const ticker = findTickerForOrder(selectedOrder, tickers);
     if (!ticker) {
-      setTradingMessage(undefined, `No local ticker exists for ${selectedOrder.contract.localSymbol || selectedOrder.contract.symbol}.`);
+      const symbol = selectedOrder.contract.localSymbol || selectedOrder.contract.symbol;
+      setNote(key, {
+        status: "Modify failed",
+        text: `No local ticker exists for ${symbol}. Add ${symbol} to a portfolio or watchlist to modify this order here.`,
+        tone: "negative",
+      });
       return;
     }
+    setNote(key, null);
+    // The ticket it opens in says the order was loaded.
     loadOrderIntoDraft(ticker.metadata.ticker, selectedOrder, ticker);
     updateTradingPaneState({
       brokerInstanceId: selectedOrder.brokerInstanceId ?? selectedOrder.contract.brokerInstanceId,
       accountId: selectedOrder.accountId,
-      lastInfo: `Loaded order ${selectedOrder.orderId} into ${ticker.metadata.ticker}.`,
-      lastError: undefined,
     });
     selectTicker(ticker.metadata.ticker, paneId);
     switchTab("ibkr-trade", paneId);
     switchPanel("right");
-  }, [selectedOrder, tickers, paneId, selectTicker, switchTab, switchPanel]);
+  }, [selectedOrder, tickers, paneId, selectTicker, switchTab, switchPanel, setNote]);
 
   const hasProfile = Boolean(selectedInstance && isGatewayMode);
   const [storedTab, setTab] = usePluginPaneState<TradingConsoleTab>("tab", "orders");
@@ -414,6 +448,7 @@ export function TradingPane({ focused, width, height }: PaneProps) {
         }
       }}
       onSelectOpenOrderIndex={(index) => updateTradingPaneState({ selectedOpenOrderIndex: index })}
+      noteFor={noteFor}
       onSelectTab={setTab}
       selectedOpenOrderIndex={tradeState.selectedOpenOrderIndex}
       statItems={buildAccountStatItems(activeAccount)}

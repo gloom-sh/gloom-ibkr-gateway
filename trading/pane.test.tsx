@@ -55,8 +55,8 @@ const SNAPSHOT: IbkrSnapshot = {
   executions: [],
 };
 
-/** A connected service that answers from SNAPSHOT and records cancels instead of sending them. */
-function stubGateway(cancelled: number[]): void {
+/** A connected service that answers from SNAPSHOT and records cancels instead of sending them; `refuse` makes IBKR refuse them. */
+function stubGateway(cancelled: number[], refuse?: string): void {
   const service = ibkrGatewayManager.getService(INSTANCE_ID) as any;
   service.getSnapshot = () => SNAPSHOT;
   service.subscribe = () => () => {};
@@ -64,8 +64,13 @@ function stubGateway(cancelled: number[]): void {
   service.getAccounts = async () => SNAPSHOT.accounts;
   service.listOpenOrders = async () => SNAPSHOT.openOrders;
   service.listExecutions = async () => [];
-  service.cancelOrder = async (_config: unknown, orderId: number) => { cancelled.push(orderId); };
+  service.cancelOrder = async (_config: unknown, orderId: number) => {
+    cancelled.push(orderId);
+    if (refuse) throw new Error(refuse);
+  };
 }
+
+const toasts: string[] = [];
 
 function Harness() {
   const config = {
@@ -76,7 +81,12 @@ function Harness() {
   state.focusedPaneId = PANE_ID;
   return (
     <TestDialogProvider>
-      <TestPaneProvider state={state} paneId={PANE_ID} pluginId="ibkr-gateway" runtime={createTestPluginRuntime()}>
+      <TestPaneProvider
+        state={state}
+        paneId={PANE_ID}
+        pluginId="ibkr-gateway"
+        runtime={createTestPluginRuntime({ notify: (notification) => { toasts.push(notification.body ?? ""); } })}
+      >
         <PaneFooterProvider>
           {(footer) => (
             <Box width={84} height={20} flexDirection="column">
@@ -96,6 +106,7 @@ afterEach(async () => {
     setup = undefined;
   }
   clearTradingDraft();
+  toasts.length = 0;
   await ibkrGatewayManager.removeInstance(INSTANCE_ID);
 });
 
@@ -121,4 +132,25 @@ test("asks before cancelling an open order and cancels only once confirmed", asy
   await emitKeypress(setup!, { name: "return", sequence: "\r" });
   await settleFrame(setup!);
   expect(cancelled).toEqual([42]);
+});
+
+test("a cancel IBKR refuses is said on the order's row and under the table, not in the footer or a toast", async () => {
+  const cancelled: number[] = [];
+  stubGateway(cancelled, "Order 42 cannot be cancelled: already filled.");
+
+  await act(async () => { setup = await testRender(<Harness />, { width: 84, height: 20 }); });
+  await settleFrame(setup!);
+  await emitKeypress(setup!, { name: "c", sequence: "c" });
+  await settleFrame(setup!);
+  await emitKeypress(setup!, { name: "return", sequence: "\r" });
+  await settleFrame(setup!);
+  await settleFrame(setup!);
+
+  const lines = setup!.captureCharFrame().split("\n");
+  expect(cancelled).toEqual([42]);
+  expect(lines.find((line) => line.includes("AAPL"))).toContain("Cancel failed");
+  // The full reason under the table, once; the footer (the last line) keeps the profile's state.
+  expect(lines.filter((line) => line.includes("already filled")).length).toBe(1);
+  expect(lines.at(-1)).not.toContain("already filled");
+  expect(toasts).toEqual([]);
 });
