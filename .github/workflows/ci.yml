@@ -9,9 +9,8 @@ jobs:
   check:
     runs-on: ubuntu-latest
     env:
-      # `useRowNotes`, which the console's order rows use, from the host's
-      # row-message change; move to its merge commit, then to the 0.18.4 release.
-      GLOOMBERB_REVISION: 2954ecd24f9ab949cceccd99fe8316c28d470742
+      # The v0.18.4 release commit, the oldest host this plugin runs on (minGloom).
+      GLOOMBERB_REVISION: 5fe410331c7ec403cd5b468e2f14f900d788288e
       IBKR_REVISION: 6a4211667a07cb7530f0b0e8348bb41919be9501
     steps:
       - uses: actions/checkout@v4
